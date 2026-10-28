@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>translate-kemo — 일본 친구와 대화하려고 만든 번역기</title>
+<meta name="description" content="한국어 ↔ 일본어·영어·중국어 번역 iPhone 앱. LINE·X 대화, 사진, 대화 모드, 화면 소리 번역.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF; --ink:#191F28; --muted:#5B6573; --line:#E6E8EB;
+  --crimson:#BC2448; --mint:#0E8A6F; --gold:#F2B84B; --bubble:#F2F4F6;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121417; --ink:#F2F4F6; --muted:#A0A8B4; --line:#2A2E35; --mint:#3ECBA8; --bubble:#1C1F24; color-scheme:dark;}
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.7 "IBM Plex Sans KR",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--mint)}
+a:focus-visible{outline:2px solid var(--mint);outline-offset:3px;border-radius:4px}
+.wrap{max-width:640px;margin:0 auto;padding:0 22px}
+
+.hero{padding:64px 0 40px}
+.name{font:700 clamp(2.4rem,9vw,3.6rem)/1 "IBM Plex Sans KR",sans-serif;letter-spacing:-.03em;margin:0}
+.name span{color:var(--crimson)}
+.lead{color:var(--muted);margin:14px 0 36px;font-size:1.05rem}
+
+.chat{display:flex;flex-direction:column;gap:10px;max-width:360px}
+.b{padding:12px 16px;border-radius:20px;font-size:1.02rem;line-height:1.45;max-width:85%}
+.b.me{align-self:flex-end;background:var(--crimson);color:#fff;border-bottom-right-radius:6px}
+.b.tr{align-self:flex-end;background:var(--bubble);border:1.5px dashed var(--mint);border-bottom-right-radius:6px;font-family:"Zen Kaku Gothic New",sans-serif}
+.b.tr small{display:block;color:var(--muted);font:400 .78rem/1.4 "IBM Plex Sans KR",sans-serif;margin-top:4px}
+.b.them{align-self:flex-start;background:var(--bubble);border-bottom-left-radius:6px;font-family:"Zen Kaku Gothic New",sans-serif}
+.b.them small{display:block;color:var(--muted);font:400 .85rem/1.4 "IBM Plex Sans KR",sans-serif;margin-top:4px}
+@media (prefers-reduced-motion:no-preference){
+  .b{opacity:0;transform:translateY(6px);animation:in .35s ease-out forwards}
+  .b:nth-child(2){animation-delay:.5s}.b:nth-child(3){animation-delay:1.2s}
+  @keyframes in{to{opacity:1;transform:none}}
+}
+
+h2{font-size:1.3rem;letter-spacing:-.01em;margin:56px 0 8px}
+.feat{margin:0;padding:0;list-style:none}
+.feat li{padding:18px 0;border-top:1px solid var(--line)}
+.feat b{display:block;font-weight:600}
+.feat p{margin:2px 0 0;color:var(--muted)}
+.note{background:var(--bubble);border-left:4px solid var(--gold);padding:16px 18px;border-radius:0 12px 12px 0;margin-top:20px;color:var(--ink)}
+footer{margin:64px 0 40px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.92rem}
+footer a{margin-right:18px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <h1 class="name">translate<span>-</span>kemo</h1>
+    <p class="lead">일본 친구와 LINE·X로 대화하려고 만든 iPhone 번역기. 한국어와 일본어·영어·중국어를 오갑니다.</p>
+    <div class="chat" aria-label="번역 예시">
+      <div class="b me">내일 시부야에서 만날래?</div>
+      <div class="b tr">明日、渋谷で会わない？<small>아시타, 시부야데 아와나이?</small></div>
+      <div class="b them">いいね！何時にする？<small>좋아! 몇 시로 할까?</small></div>
+    </div>
+  </header>
+
+  <h2>할 수 있는 것</h2>
+  <ul class="feat">
+    <li><b>말투를 살린 번역</b><p>친구 사이 말투, 용어집, 금지어를 정해 두면 그대로 번역합니다. 일본어 독음은 한글로 보여 줍니다.</p></li>
+    <li><b>사진 속 글 번역</b><p>카메라나 사진에서 글자를 찾아 그 자리에 번역을 얹습니다.</p></li>
+    <li><b>대화 모드</b><p>마주 앉아 번갈아 말하면 양쪽 언어로 실시간 자막이 나옵니다.</p></li>
+    <li><b>화면 소리 번역</b><p>다른 앱에서 나오는 영상·방송 소리를 PIP 자막으로 번역합니다.</p></li>
+    <li><b>어디서든 부르기</b><p>공유 시트와 iOS 기본 번역 앱 자리에서 바로 번역합니다.</p></li>
+    <li><b>공부와 표현 노트</b><p>번역하면서 모은 표현을 노트로 정리하고 복습합니다.</p></li>
+  </ul>
+
+  <div class="note">번역에는 Google Gemini, 음성 인식에는 Soniox를 씁니다. 두 서비스의 API 키는 직접 발급받아 앱에 넣습니다. 개발자 서버는 없고, 계정 가입도 없습니다.</div>
+
+  <h2>요구 사항</h2>
+  <p>iPhone, iOS 17 이상. 기본 번역 앱 연결은 iOS 18.4 이상, 기기 안 AI 사전은 iOS 26 이상에서 동작합니다.</p>
+
+  <footer>
+    <a href="privacy.html">개인정보 처리방침</a>
+    <a href="https://github.com/kkkougaa/translate-kemo/issues">문의</a>
+    <a href="https://github.com/kkkougaa/translate-kemo">GitHub</a>
+  </footer>
+</main>
+</body>
+</html>

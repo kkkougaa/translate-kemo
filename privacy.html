@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>개인정보 처리방침 — translate-kemo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#FFFFFF;--ink:#191F28;--muted:#5B6573;--line:#E6E8EB;--crimson:#BC2448;--mint:#0E8A6F;--soft:#F2F4F6;color-scheme:light;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#121417;--ink:#F2F4F6;--muted:#A0A8B4;--line:#2A2E35;--mint:#3ECBA8;--soft:#1C1F24;color-scheme:dark}}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.75 "IBM Plex Sans KR",system-ui,-apple-system,sans-serif}
+main{max-width:680px;margin:0 auto;padding:48px 22px 64px}
+a{color:var(--mint)} a:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+.back{font-size:.92rem;text-decoration:none}
+h1{font-size:1.9rem;letter-spacing:-.02em;line-height:1.25;margin:18px 0 6px}
+.date{color:var(--muted);margin:0 0 28px}
+.summary{background:var(--soft);border-left:4px solid var(--crimson);padding:16px 20px;border-radius:0 12px 12px 0}
+.summary p{margin:0}
+h2{font-size:1.15rem;margin:40px 0 8px;padding-top:20px;border-top:1px solid var(--line)}
+ul{padding-left:1.2em} li{margin:6px 0}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.94rem;margin-top:8px}
+th,td{text-align:left;vertical-align:top;padding:10px 8px;border-bottom:1px solid var(--line)}
+th{font-weight:600;white-space:nowrap}
+.en{color:var(--muted);font-size:.94rem}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="./">translate-kemo</a>
+<h1>개인정보 처리방침</h1>
+<p class="date">시행일: 2026년 10월 28일</p>
+
+<div class="summary"><p>translate-kemo는 개발자가 운영하는 서버가 없습니다. 이용자 정보를 개발자에게 보내지 않고, 광고·분석·추적 도구도 쓰지 않습니다. 번역할 글과 소리는 이용자가 직접 넣은 API 키로 Google Gemini와 Soniox에 바로 전송됩니다.</p></div>
+
+<h2>1. 개발자가 수집하는 정보</h2>
+<p>없습니다. 회원 가입, 로그인, 사용 통계, 오류 보고, 광고 식별자 수집 기능이 없습니다.</p>
+
+<h2>2. 기기 안에만 저장되는 정보</h2>
+<p>아래 정보는 이용자의 iPhone 안(앱과 앱 확장이 함께 쓰는 저장 공간)에만 저장되며, 앱을 지우면 함께 삭제됩니다.</p>
+<ul>
+  <li>Gemini·Soniox API 키와 앱 설정</li>
+  <li>번역 기록, 용어집, 금지어, 표현 노트와 공부 기록</li>
+  <li>이용자가 고른 프로필 이미지, 캐릭터 이름 등 꾸미기 설정</li>
+</ul>
+<p>설정의 백업 기능을 쓰면 위 정보가 JSON 파일로 만들어지며, 이 파일에는 API 키도 들어 있습니다. 파일을 어디에 저장하거나 누구와 공유할지는 이용자가 정하며, 개발자에게는 전달되지 않습니다.</p>
+
+<h2>3. 외부 서비스로 전송되는 정보</h2>
+<p>기능을 쓰는 순간에만, 이용자의 기기에서 해당 서비스로 직접 전송됩니다. 개발자 서버를 거치지 않습니다.</p>
+<div class="tbl"><table>
+  <tr><th>받는 곳</th><th>보내는 정보</th><th>쓰는 기능</th></tr>
+  <tr><td>Google Gemini API</td><td>번역할 글, 사진(이미지), 음성으로 읽을 글</td><td>번역, 독음, 사전, 음성 읽기, 사진 번역</td></tr>
+  <tr><td>Soniox</td><td>마이크 소리, 화면 기록 확장으로 받은 다른 앱의 소리</td><td>대화 모드, 말로 입력, 화면 소리 번역</td></tr>
+  <tr><td>unavatar.io</td><td>이용자가 입력한 X(트위터) 계정 이름</td><td>X 프로필 사진을 아바타로 표시 (입력한 경우에만)</td></tr>
+  <tr><td>Apple</td><td>말로 입력할 때의 음성</td><td>기기에서 처리할 수 없는 언어일 때만 Apple 음성 인식 서버 사용</td></tr>
+</table></div>
+<p>Google과 Soniox로 보낸 정보는 이용자가 키를 발급받은 계정의 약관과 각 회사의 개인정보 처리방침에 따라 처리됩니다. 특히 Gemini API를 무료 등급으로 쓰면 Google이 보낸 내용을 서비스 개선에 쓸 수 있으니 Google의 약관을 확인하세요.</p>
+<ul>
+  <li><a href="https://ai.google.dev/gemini-api/terms">Gemini API 추가 서비스 약관</a> · <a href="https://policies.google.com/privacy">Google 개인정보처리방침</a></li>
+  <li><a href="https://soniox.com">Soniox</a> (사이트 하단의 Privacy Policy)</li>
+  <li><a href="https://unavatar.io">unavatar.io</a></li>
+</ul>
+<p>일본어 독음, 사진 속 글자 위치 찾기, iOS 26의 기기 안 AI 사전은 기기 안에서만 처리되어 외부로 나가지 않습니다.</p>
+
+<h2>4. 앱이 요청하는 권한</h2>
+<ul>
+  <li><b>마이크</b>: 대화 모드와 말로 입력에서 목소리를 받아 적습니다.</li>
+  <li><b>음성 인식</b>: 말로 입력을 기기 안에서 받아 적습니다.</li>
+  <li><b>카메라·사진</b>: 사진 속 글을 번역하고, 번역한 이미지를 사진 앱에 저장합니다.</li>
+  <li><b>화면 기록</b>: 화면 소리 번역을 켰을 때만 다른 앱의 소리를 받습니다. 화면 영상은 쓰지 않습니다.</li>
+</ul>
+<p>권한은 iPhone 설정 앱에서 언제든 끌 수 있으며, 끄면 해당 기능만 쓸 수 없습니다.</p>
+
+<h2>5. 보관과 삭제</h2>
+<p>개발자는 정보를 보관하지 않습니다. 기기 안의 정보는 앱 안에서 기록을 지우거나 앱을 삭제하면 사라집니다. 외부 서비스에 보낸 정보의 보관과 삭제는 각 서비스의 정책을 따릅니다.</p>
+
+<h2>6. 아동</h2>
+<p>이 앱은 아동을 대상으로 하지 않으며, 아동의 정보를 따로 수집하지 않습니다.</p>
+
+<h2>7. 바뀔 때</h2>
+<p>이 방침이 바뀌면 이 페이지에 새 시행일과 함께 올립니다.</p>
+
+<h2>8. 문의</h2>
+<p><a href="https://github.com/kkkougaa/translate-kemo/issues">GitHub 이슈</a>로 문의해 주세요.</p>
+
+<h2 lang="en">Summary in English</h2>
+<p class="en" lang="en">translate-kemo has no developer-run server and collects no data. There is no account, analytics, advertising or tracking. Settings, API keys, history and notes are stored only on the device. When you use a feature, the text, images or audio you choose are sent directly from your device to Google Gemini or Soniox using API keys you provide, and are handled under those services' terms. If you enter an X username for your avatar, it is sent to unavatar.io to fetch the profile picture. Contact: GitHub Issues at github.com/kkkougaa/translate-kemo.</p>
+</main>
+</body>
+</html>
