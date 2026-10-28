@@ -117,6 +117,17 @@ jobs:
             echo "ok=0" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: App Store Connect 확인 (번들 ID · 앱)
+        if: steps.keys.outputs.ok == '1'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/asc"
+          "$RUNNER_TEMP/asc/bin/pip" install -q pyjwt cryptography
+          "$RUNNER_TEMP/asc/bin/python" .github/scripts/asc_check.py \
+            "${{ steps.keys.outputs.path }}" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate translate-kemo
+
       # 친구가 준 배포 인증서(p12)가 있으면 그걸로 서명한다 — 없거나 못 읽으면 자동 서명이 새로 만든다
       - name: 인증서 가져오기 (p12, 있으면)
         if: steps.keys.outputs.ok == '1'
