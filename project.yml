@@ -1,0 +1,168 @@
+# XcodeGen 프로젝트 정의. GitHub Actions 의 macOS 러너에서 `xcodegen generate` 로 .xcodeproj 를 만든다.
+# 로컬에 Xcode 가 없어도 이 파일과 소스만 있으면 된다.
+name: TranslateKemo
+options:
+  bundleIdPrefix: com.kouga
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    # 기본은 무서명(컴파일 확인). TestFlight 빌드는 CI 가 자동 서명으로 덮어쓴다.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+
+targets:
+  TranslateKemo:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Shared
+    dependencies:
+      - target: TranslateKemoBroadcast
+        embed: true
+        codeSign: false
+      - target: TranslateKemoShare
+        embed: true
+        codeSign: false
+      - target: TranslateKemoTranslate
+        embed: true
+        codeSign: false
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: translate-kemo
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # 화면 소리 번역 PIP 가 떠 있는 동안 앱이 계속 돌아야 한다
+        UIBackgroundModes: [audio]
+        # HTTPS 외 암호화를 안 쓴다 — TestFlight 업로드 때 수출 규정 질문을 건너뛴다
+        ITSAppUsesNonExemptEncryption: false
+        # 기본 번역 앱 확장이 Gemini 를 부른다
+        com.apple.developer.translation-ui-provider.network-access: true
+        NSMicrophoneUsageDescription: 대화 모드와 말로 입력에서 목소리를 받아 적습니다.
+        NSSpeechRecognitionUsageDescription: 말로 입력을 기기 안에서 받아 적습니다.
+        NSCameraUsageDescription: 사진을 찍어 그 안의 글을 번역합니다.
+        NSPhotoLibraryAddUsageDescription: 번역한 이미지를 사진 앱에 저장합니다.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate
+        PRODUCT_NAME: TranslateKemo
+        INFOPLIST_KEY_CFBundleDisplayName: translate-kemo
+        SWIFT_EMIT_LOC_STRINGS: "NO"
+        # 앱 그룹 · 기본 번역 앱. 무서명 빌드에선 안 박히고, TestFlight 빌드에서 서명과 함께 들어간다.
+        CODE_SIGN_ENTITLEMENTS: App/TranslateKemo.entitlements
+
+  # 화면 기록(방송) 확장 — 다른 앱 소리를 받아 본 앱으로 넘긴다 (화면 소리 번역)
+  TranslateKemoBroadcast:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BroadcastExtension
+    info:
+      path: BroadcastExtension/Info.plist
+      properties:
+        CFBundleDisplayName: translate-kemo
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate.broadcast
+        PRODUCT_NAME: TranslateKemoBroadcast
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        SKIP_INSTALL: "YES"
+
+  # 공유 시트 → "translate-kemo" 액션 확장. 앱을 열지 않고 카드로 번역을 띄운다
+  TranslateKemoShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+      - path: App/Translator/TLText.swift
+      - path: App/Translator/TLPrompt.swift
+      - path: App/Translator/Gemini.swift
+      - path: Shared/Glass.swift
+      - path: Shared/Haptics.swift
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: translate-kemo
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ui-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ActionViewController
+          NSExtensionActionWantsFullScreenPresentation: true
+          NSExtensionAttributes:
+            NSExtensionServiceRoleType: NSExtensionServiceRoleTypeEditor
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate.action
+        PRODUCT_NAME: TranslateKemoShare
+        CODE_SIGN_ENTITLEMENTS: ShareExtension/TranslateKemoShare.entitlements
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        SKIP_INSTALL: "YES"
+
+  # 기본 번역 앱 확장 (iOS 18.4+) — 글을 고르고 '번역'을 누르면 시스템 시트 안에 우리 카드
+  TranslateKemoTranslate:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.4"
+    sources:
+      - path: TranslateExtension
+      - path: ShareExtension/TLActionView.swift
+      - path: ShareExtension/TLActionStore.swift
+      - path: ShareExtension/Assets.xcassets
+      - path: App/Translator/TLText.swift
+      - path: App/Translator/TLPrompt.swift
+      - path: App/Translator/Gemini.swift
+      - path: Shared/Glass.swift
+      - path: Shared/Haptics.swift
+    info:
+      path: TranslateExtension/Info.plist
+      properties:
+        CFBundleDisplayName: translate-kemo
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        com.apple.developer.translation-ui-provider.network-access: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.public.translation-ui-provider
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate.translate
+        PRODUCT_NAME: TranslateKemoTranslate
+        CODE_SIGN_ENTITLEMENTS: TranslateExtension/TranslateKemoTranslate.entitlements
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        SKIP_INSTALL: "YES"
+
+schemes:
+  TranslateKemo:
+    build:
+      targets:
+        TranslateKemo: all
+        TranslateKemoBroadcast: all
+        TranslateKemoShare: all
+        TranslateKemoTranslate: all
+    run:
+      config: Debug
+    archive:
+      config: Release

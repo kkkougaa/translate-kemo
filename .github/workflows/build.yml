@@ -1,0 +1,246 @@
+# 맥 없이 빌드하기.
+#   build      : 컴파일 확인. translate 등 main 이 아닌 브랜치는 여기서 끝 (무서명, ipa 안 만듦)
+#   testflight : main 에 합치면 정식 서명해서 TestFlight 에 올린다.
+#                App Store Connect API 키가 저장소 Secrets 에 아직 없으면 무서명 ipa 만 아티팩트로 남긴다.
+#
+# 필요한 Secrets (Settings → Secrets and variables → Actions)
+#   ASC_KEY_ID      App Store Connect 팀 API 키의 키 ID
+#   ASC_ISSUER_ID   발급자 ID (Issuer ID)
+#   ASC_KEY_P8      내려받은 AuthKey_XXXX.p8 파일 내용 전체 (-----BEGIN PRIVATE KEY----- 부터 끝까지)
+#   APPLE_TEAM_ID   개발자 계정 팀 ID (10자리)
+#   P12_BASE64      (선택) 배포 인증서 .p12 를 base64 로 바꾼 것
+#   P12_PASSWORD    (선택) 그 .p12 의 비밀번호
+name: Build · TestFlight
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 최신 Xcode 선택
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: 빌드 (무서명 · 컴파일 확인)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TranslateKemo.xcodeproj \
+            -scheme TranslateKemo \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build 2>&1 | tee build.log
+
+      - name: 오류 요약
+        if: failure()
+        run: |
+          echo "===== error 줄 ====="
+          grep -n "error:" build.log | head -50 || true
+          echo "===== 마지막 80줄 ====="
+          tail -80 build.log
+          grep "error:" build.log | sed 's#.*/translate-kemo/translate-kemo/##' | sort -u | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done || true
+
+      - name: 빌드 로그 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+  testflight:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 최신 Xcode 선택
+        run: |
+          XC=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: XcodeGen 설치
+        run: brew install xcodegen
+
+      - name: 프로젝트 생성
+        run: xcodegen generate --spec project.yml
+
+      - name: API 키 확인
+        id: keys
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            mkdir -p "$RUNNER_TEMP/keys"
+            KEY="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
+            printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+            echo "path=$KEY" >> "$GITHUB_OUTPUT"
+            echo "ok=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::App Store Connect API 키가 Secrets 에 없어서 TestFlight 업로드를 건너뛰고 무서명 ipa 만 만든다"
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 친구가 준 배포 인증서(p12)가 있으면 그걸로 서명한다 — 없거나 못 읽으면 자동 서명이 새로 만든다
+      - name: 인증서 가져오기 (p12, 있으면)
+        if: steps.keys.outputs.ok == '1'
+        env:
+          P12_BASE64: ${{ secrets.P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then echo "p12 없음 — 자동 서명에 맡긴다"; exit 0; fi
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          PW=$(uuidgen)
+          security create-keychain -p "$PW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$PW" "$KC"
+          printf '%s' "$P12_BASE64" | tr -d '\r\n ' | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          if security import "$RUNNER_TEMP/cert.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KC"; then
+            security set-key-partition-list -S apple-tool:,apple: -k "$PW" "$KC" > /dev/null
+            security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+            security find-identity -v -p codesigning "$KC"
+          else
+            echo "::warning::p12 를 못 읽었다 (비밀번호나 형식 확인). 자동 서명에 맡긴다"
+          fi
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      # ── 키가 있을 때: 정식 서명 → TestFlight ──
+      - name: 아카이브 (자동 서명)
+        if: steps.keys.outputs.ok == '1'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          # 빌드 번호는 실행 번호로 — TestFlight 는 같은 버전 안에서 번호가 늘어야 받는다
+          xcodebuild \
+            -project TranslateKemo.xcodeproj \
+            -scheme TranslateKemo \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/TranslateKemo.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${{ steps.keys.outputs.path }}" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            archive 2>&1 | tee build.log
+
+      - name: TestFlight 올리기
+        if: steps.keys.outputs.ok == '1'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          cat > ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/TranslateKemo.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${{ steps.keys.outputs.path }}" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            2>&1 | tee -a build.log
+          echo "::notice::TestFlight 에 빌드 ${{ github.run_number }} 를 올렸어. App Store Connect 에서 처리가 끝나면 테스터에게 간다"
+
+      # ── 키가 없을 때: 무서명 ipa ──
+      - name: 무서명 빌드
+        if: steps.keys.outputs.ok != '1'
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TranslateKemo.xcodeproj \
+            -scheme TranslateKemo \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build 2>&1 | tee build.log
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          test -n "$APP"
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "Payload/$(basename "$APP")/Info.plist" || echo dev)
+          zip -qr "TranslateKemo-${VERSION}-unsigned.ipa" Payload
+
+      - name: 무서명 ipa 올리기
+        if: steps.keys.outputs.ok != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TranslateKemo-unsigned-ipa
+          path: "*.ipa"
+          if-no-files-found: error
+
+      - name: 오류 요약
+        if: failure()
+        run: |
+          echo "===== error 줄 ====="
+          grep -n "error:\|Error Domain\|No profiles\|provisioning" build.log | head -60 || true
+          echo "===== 마지막 80줄 ====="
+          tail -80 build.log
+          grep "error:" build.log | sed 's#.*/translate-kemo/translate-kemo/##' | sort -u | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done || true
+
+      - name: 빌드 로그 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-log
+          path: build.log
