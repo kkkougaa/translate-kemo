@@ -103,7 +103,13 @@ jobs:
           if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8" ] && [ -n "$APPLE_TEAM_ID" ]; then
             mkdir -p "$RUNNER_TEMP/keys"
             KEY="$RUNNER_TEMP/keys/AuthKey_${ASC_KEY_ID}.p8"
-            printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+            # 붙여 넣다가 줄바꿈이 빠지거나 머리·꼬리 줄이 없어도 되게, 본문만 뽑아 PEM 모양으로 다시 감싼다
+            BODY=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \n\t')
+            { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$BODY" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$KEY"
+            if ! openssl pkey -in "$KEY" -noout 2>/dev/null; then
+              echo "::error::ASC_KEY_P8 을 키로 못 읽었다 (본문 ${#BODY}자, 보통 184자). .p8 파일 내용 전체를 다시 넣어 줘"
+              exit 1
+            fi
             echo "path=$KEY" >> "$GITHUB_OUTPUT"
             echo "ok=1" >> "$GITHUB_OUTPUT"
           else
