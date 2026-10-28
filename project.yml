@@ -61,6 +61,9 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate
         PRODUCT_NAME: TranslateKemo
+        # 아이폰 전용. XcodeGen 이 타깃마다 "1,2"(아이패드 포함)를 넣어서 여기서 다시 막는다 —
+        # 아이패드가 들어가면 세로만 지원하는 앱은 업로드 검증에서 떨어진다.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_CFBundleDisplayName: translate-kemo
         SWIFT_EMIT_LOC_STRINGS: "NO"
         # 앱 그룹 · 기본 번역 앱. 무서명 빌드에선 안 박히고, TestFlight 빌드에서 서명과 함께 들어간다.
@@ -123,8 +126,10 @@ targets:
         SKIP_INSTALL: "YES"
 
   # 기본 번역 앱 확장 (iOS 18.4+) — 글을 고르고 '번역'을 누르면 시스템 시트 안에 우리 카드
+  # 이 확장 지점은 ExtensionKit 확장이어야 한다 (EXAppExtensionAttributes, 앱의 Extensions 폴더).
+  # 옛 NSExtension 모양으로 만들면 TestFlight 업로드 검증에서 떨어진다.
   TranslateKemoTranslate:
-    type: app-extension
+    type: extensionkit-extension
     platform: iOS
     deploymentTarget: "18.4"
     sources:
@@ -144,8 +149,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         com.apple.developer.translation-ui-provider.network-access: true
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.public.translation-ui-provider
+        EXAppExtensionAttributes:
+          EXExtensionPointIdentifier: com.apple.public.translation-ui-provider
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kouga.kemotranslate.translate
