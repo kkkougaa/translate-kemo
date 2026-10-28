@@ -150,23 +150,28 @@ jobs:
         run: |
           set -o pipefail
           # 빌드 번호는 실행 번호로 — TestFlight 는 같은 버전 안에서 번호가 늘어야 받는다
-          xcodebuild \
-            -project TranslateKemo.xcodeproj \
-            -scheme TranslateKemo \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/TranslateKemo.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "${{ steps.keys.outputs.path }}" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
-            CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGN_IDENTITY="Apple Development" \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            archive 2>&1 | tee build.log
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          run_archive() {
+            xcodebuild \
+              -project TranslateKemo.xcodeproj \
+              -scheme TranslateKemo \
+              -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath build/TranslateKemo.xcarchive \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "${{ steps.keys.outputs.path }}" \
+              -authenticationKeyID "$ASC_KEY_ID" \
+              -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_STYLE=Automatic \
+              CODE_SIGNING_ALLOWED=YES \
+              CODE_SIGNING_REQUIRED=YES \
+              CODE_SIGN_IDENTITY="Apple Development" \
+              CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+              archive 2>&1 | tee -a build.log
+          }
+          # 첫 실행은 프로필을 막 받아 오다가 파일을 못 찾고 떨어질 때가 있어서 한 번 더
+          run_archive || { echo "::warning::아카이브 다시 시도"; run_archive; }
 
       - name: TestFlight 올리기
         if: steps.keys.outputs.ok == '1'
