@@ -127,6 +127,9 @@ jobs:
           "$RUNNER_TEMP/asc/bin/pip" install -q pyjwt cryptography
           "$RUNNER_TEMP/asc/bin/python" .github/scripts/asc_check.py \
             "${{ steps.keys.outputs.path }}" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate translate-kemo
+          # 지난 실행들이 남긴 개발용 인증서 정리 — 안 하면 팀 인증서 한도가 찬다
+          "$RUNNER_TEMP/asc/bin/python" .github/scripts/asc_certs.py \
+            "${{ steps.keys.outputs.path }}" "$ASC_KEY_ID" "$ASC_ISSUER_ID" stale
 
       # 친구가 준 배포 인증서(p12)가 있으면 그걸로 서명한다 — 없거나 못 읽으면 자동 서명이 새로 만든다
       - name: 인증서 가져오기 (p12, 있으면)
@@ -217,6 +220,19 @@ jobs:
             2>&1 | tee -a build.log
           echo "::notice::TestFlight 에 빌드 ${{ github.run_number }} 를 올렸어. App Store Connect 에서 처리가 끝나면 테스터에게 간다"
 
+      - name: 이번 실행이 만든 개발용 인증서 정리
+        if: always() && steps.keys.outputs.ok == '1'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          security find-certificate -a -c "Apple Development" -p > "$RUNNER_TEMP/dev.pem" 2>/dev/null || true
+          SERIALS=$("$RUNNER_TEMP/asc/bin/python" -c "import sys; from cryptography import x509; print(' '.join(format(c.serial_number, 'X') for c in x509.load_pem_x509_certificates(open(sys.argv[1], 'rb').read())))" "$RUNNER_TEMP/dev.pem" 2>/dev/null || true)
+          echo "이번 실행의 개발용 인증서: ${SERIALS:-없음}"
+          [ -n "$SERIALS" ] || exit 0
+          "$RUNNER_TEMP/asc/bin/python" .github/scripts/asc_certs.py \
+            "${{ steps.keys.outputs.path }}" "$ASC_KEY_ID" "$ASC_ISSUER_ID" revoke $SERIALS
+
       # ── 키가 없을 때: 무서명 ipa ──
       - name: 무서명 빌드
         if: steps.keys.outputs.ok != '1'
@@ -270,7 +286,8 @@ jobs:
   # 업로드 뒤 애플 처리 지켜보기 — App Store Connect 화면엔 처리 중일 때 아무것도 안 떠서 여기서 본다
   processing:
     needs: testflight
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # 업로드에 실패해도 지금까지 올라간 빌드 목록은 본다
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -287,4 +304,4 @@ jobs:
           BODY=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \n\t')
           { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$BODY" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$KEY"
           pip install -q pyjwt cryptography
-          python3 .github/scripts/asc_builds.py "$KEY" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate "${{ github.run_number }}" 30
+          python3 .github/scripts/asc_builds.py "$KEY" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate "${{ github.run_number }}" ${{ needs.testflight.result == 'success' && 30 || 0 }}

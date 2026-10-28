@@ -40,9 +40,14 @@ def main():
                  "&fields[builds]=version,processingState,uploadedDate,expired")
         return [b["attributes"] for b in r["data"]]
 
-    for b in builds():
+    listed = builds()
+    if not listed:
+        print("::notice::App Store Connect 에 올라간 빌드가 하나도 없다")
+    for b in listed:
         print(f"::notice::올라간 빌드 {b['version']} — {b['processingState']} ({b['uploadedDate']})")
 
+    if wait_min <= 0:
+        return  # 업로드를 못 한 실행 — 목록만 본다
     deadline = time.time() + wait_min * 60
     last = None
     while time.time() < deadline:
