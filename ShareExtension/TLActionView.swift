@@ -68,6 +68,20 @@ final class TLActionModel: ObservableObject {
         }
     }
 
+    /// 자동 감지가 틀렸을 때 원문 언어를 손으로 고친다.
+    /// 한국어로 고르면 마지막에 고른 언어로, 외국어로 고르면 그 언어 → 한국어로 다시 번역한다.
+    func pickSource(_ l: String) {
+        guard l != srcLang else { return }
+        if l == "ko" {
+            srcLang = "ko"
+            tgtLang = settings.lastTgt
+        } else {
+            srcLang = l
+            tgtLang = l
+        }
+        translate()
+    }
+
     func pickTarget(_ l: String) {
         guard !toKO, l != tgtLang else { return }
         tgtLang = l
@@ -283,37 +297,47 @@ struct TLActionView: View {
 
     private var langPill: some View {
         HStack(spacing: 8) {
-            Text(m.srcName).foregroundStyle(Color.taText2)
+            // 원문 언어 — 자동 감지가 틀릴 때가 있어서 고를 수 있게 한다
+            langMenu(name: m.srcName, current: m.srcLang, options: ["ko"] + TLLang.order,
+                     secondary: true) { m.pickSource($0) }
             Image(systemName: "arrow.right")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.taText3)
             if m.toKO {
                 Text(m.tgtName)
             } else {
-                Menu {
-                    ForEach(TLLang.order, id: \.self) { l in
-                        Button {
-                            m.pickTarget(l)
-                        } label: {
-                            if l == m.tgtLang { Label(TLLang.cfg(l).label, systemImage: "checkmark") }
-                            else { Text(TLLang.cfg(l).label) }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(m.tgtName).foregroundStyle(.primary)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.taText3)
-                    }
-                }
-                .buttonStyle(.plain)
+                langMenu(name: m.tgtName, current: m.tgtLang, options: TLLang.order) { m.pickTarget($0) }
             }
         }
         .font(.system(size: 14, weight: .semibold))
         .padding(.horizontal, 14)
         .frame(height: 34)
         .liquidGlass()
+    }
+
+    private func langLabel(_ l: String) -> String { l == "ko" ? "한국어" : TLLang.cfg(l).label }
+
+    private func langMenu(name: String, current: String, options: [String], secondary: Bool = false,
+                          pick: @escaping (String) -> Void) -> some View {
+        Menu {
+            ForEach(options, id: \.self) { l in
+                Button {
+                    Haptics.light()
+                    pick(l)
+                } label: {
+                    if l == current { Label(langLabel(l), systemImage: "checkmark") }
+                    else { Text(langLabel(l)) }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(name).foregroundStyle(secondary ? Color.taText2 : Color.primary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.taText3)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var sourceText: some View {
