@@ -830,8 +830,7 @@ struct TranslatorView: View {
     @ViewBuilder
     private var metaPills: some View {
         let pol = m.politeness
-        let sugs = m.glossarySuggestions
-        if !pol.isEmpty || m.usedPriority || m.usedPlamo || !m.btWarn.isEmpty || !sugs.isEmpty {
+        if !pol.isEmpty || m.usedPriority || m.usedPlamo || !m.btWarn.isEmpty {
             TLFlow(spacing: 5) {
                 if m.usedPlamo { pill("기기 안 PLaMo") }
                 if !pol.isEmpty { pill(pol) }
@@ -843,27 +842,6 @@ struct TranslatorView: View {
                         .padding(.horizontal, 10)
                         .frame(height: 24)
                         .background(Color.tlWarn.opacity(0.13), in: Capsule())
-                }
-                ForEach(sugs, id: \.self) { s in
-                    HStack(spacing: 0) {
-                        Button { m.acceptSuggestion(s) } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus").font(.system(size: 9, weight: .heavy))
-                                Text(s.x + " → " + s.k)
-                            }
-                            .padding(.leading, 10).padding(.trailing, 6)
-                            .frame(height: 24)
-                        }
-                        .buttonStyle(.plain)
-                        Button { withAnimation { m.dismissSuggestion(s) } } label: {
-                            Text("×").padding(.leading, 2).padding(.trailing, 9).frame(height: 24)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("다시 묻지 않기")
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.tlAccentDark)
-                    .background(Color.tlAccent.opacity(0.12), in: Capsule())
                 }
             }
             .padding(.horizontal, 16)

@@ -164,14 +164,6 @@ final class TLStore: ObservableObject {
         bump()
         TLShare.publish()
     }
-    func glossarySkip(_ lang: String) -> [String] {
-        Self.decode([String].self, d.string(forKey: k("glossary_skip_" + lang))?.data(using: .utf8)) ?? []
-    }
-    func addGlossarySkip(_ key: String, lang: String) {
-        var s = glossarySkip(lang); s.append(key)
-        if let data = try? JSONEncoder().encode(Array(s.suffix(200))) { d.set(String(data: data, encoding: .utf8), forKey: k("glossary_skip_" + lang)) }
-        bump()
-    }
 
     // MARK: 말투
 

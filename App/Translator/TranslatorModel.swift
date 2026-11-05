@@ -502,26 +502,6 @@ final class TranslatorModel: ObservableObject {
         }
     }
 
-    // MARK: 용어집 제안
-
-    var glossarySuggestions: [Glossary.Suggestion] {
-        guard succeeded, mode == .translate, srcLang == "ko", tgtLang == "ja" else { return [] }
-        return Glossary.suggest(srcText: originalText, history: store.history, tgtLabel: TLLang.cfg(tgtLang).label,
-                                pairs: store.glossary(tgtLang), skip: store.glossarySkip(tgtLang))
-    }
-
-    func acceptSuggestion(_ s: Glossary.Suggestion) {
-        var list = store.glossary(tgtLang)
-        if !list.contains(where: { $0.from == s.x }) { list.append(GlossaryPair(from: s.x, to: s.k)) }
-        store.setGlossary(list, lang: tgtLang)
-        show("용어집에 넣었어요")
-        TLHaptic.select()
-    }
-
-    func dismissSuggestion(_ s: Glossary.Suggestion) {
-        store.addGlossarySkip(s.x + "=" + s.k, lang: tgtLang)
-    }
-
     // MARK: 복사·알림
 
     func copyResult() {
