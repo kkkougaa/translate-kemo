@@ -48,8 +48,15 @@ final class TLStore: ObservableObject {
     @Published var tabLabels: Bool { didSet { d.set(tabLabels, forKey: k("tab_labels")) } }
     /// 말로 입력 엔진: device(기기 안) · soniox
     @Published var dictationEngine: String { didSet { d.set(dictationEngine, forKey: k("dictation_engine")) } }
-    /// 번역 엔진: gemini · plamo(기기 안 PLaMo 3 Translate). 코멘트·피드백·사진은 언제나 Gemini.
+    /// 기능별 번역 엔진 — gemini · plamo(기기 안 PLaMo 3 Translate). 코멘트·피드백·사진은 언제나 Gemini.
+    /// 번역 화면
     @Published var engine: String { didSet { d.set(engine, forKey: k("engine")) } }
+    /// 역번역
+    @Published var engineBack: String { didSet { d.set(engineBack, forKey: k("engine_back")) } }
+    /// 화면 소리 번역 — soniox(받아쓰기와 번역을 Soniox 가 같이) · plamo(받아쓰기만 Soniox, 번역은 기기 안)
+    @Published var engineScreen: String { didSet { d.set(engineScreen, forKey: k("engine_screen")) } }
+    /// 기본 번역 앱 · 공유 시트 카드
+    @Published var engineExt: String { didSet { d.set(engineExt, forKey: k("engine_ext")); TLShare.publish() } }
     @Published var ttsModel: String { didSet { d.set(ttsModel.trimmed, forKey: k("gemini_tts_model")) } }
     @Published var ttsVoice: String { didSet { d.set(ttsVoice, forKey: k("gemini_tts_voice")) } }
     @Published var ttsStyle: String { didSet { d.set(ttsStyle, forKey: k("gemini_tts_style")) } }
@@ -73,6 +80,9 @@ final class TLStore: ObservableObject {
         sonioxKey = d.string(forKey: "tl.soniox_key") ?? ""
         dictationEngine = d.string(forKey: "tl.dictation_engine") ?? "device"
         engine = d.string(forKey: "tl.engine") ?? "gemini"
+        engineBack = d.string(forKey: "tl.engine_back") ?? "gemini"
+        engineScreen = d.string(forKey: "tl.engine_screen") ?? "soniox"
+        engineExt = d.string(forKey: "tl.engine_ext") ?? "gemini"
         barTint = d.string(forKey: "tl.bar_tint") ?? TLStore.defaultBarTint
         buttonTint = d.string(forKey: "tl.button_tint") ?? ""
         writeTint = d.string(forKey: "tl.write_tint") ?? TLStore.defaultWriteTint
@@ -105,6 +115,9 @@ final class TLStore: ObservableObject {
     var effectiveTTSModel: String { ttsModel.trimmed.isEmpty ? Self.defaultTTSModel : ttsModel.trimmed }
     var effectiveImageModel: String { imageModel.trimmed.isEmpty ? Self.defaultImageModel : imageModel.trimmed }
     var hasKey: Bool { !apiKey.trimmed.isEmpty }
+    /// 번역을 기기 안 모델로 하면 Gemini 는 코멘트·피드백 같은 곁일만 한다 — Thinking · 우선 처리는 끈다
+    var geminiThinking: Bool { thinking && engine != "plamo" }
+    var geminiPriority: Bool { priority && engine != "plamo" }
 
     private static func decode<T: Decodable>(_ t: T.Type, _ data: Data?) -> T? {
         guard let data else { return nil }

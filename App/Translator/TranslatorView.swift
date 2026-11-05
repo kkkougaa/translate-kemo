@@ -509,12 +509,15 @@ struct TranslatorView: View {
             toggleRow("원문 충실 번역",
                       m.strict ? "on — 원문 그대로 충실하게 번역" : "off — 내용을 정리·보완하며 번역",
                       isOn: $m.strict)
-            toggleRow("Thinking 모드",
-                      store.thinking ? "on — 느리지만 정확하게" : "off — 빠른 번역",
-                      isOn: $store.thinking)
-            toggleRow("우선 처리",
-                      store.priority ? "on — 표준의 1.75~2배" : "off — 표준 요금",
-                      isOn: $store.priority)
+            // 기기 안 모델로 번역할 땐 Gemini 옵션이 번역에 안 쓰여서 숨긴다 (코멘트·피드백도 끈 채로 간다)
+            if store.engine != "plamo" {
+                toggleRow("Thinking 모드",
+                          store.thinking ? "on — 느리지만 정확하게" : "off — 빠른 번역",
+                          isOn: $store.thinking)
+                toggleRow("우선 처리",
+                          store.priority ? "on — 표준의 1.75~2배" : "off — 표준 요금",
+                          isOn: $store.priority)
+            }
         }
     }
 

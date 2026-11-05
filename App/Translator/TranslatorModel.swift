@@ -204,15 +204,15 @@ final class TranslatorModel: ObservableObject {
 
     var genCfg: [String: Any] {
         var g: [String: Any] = ["temperature": 0.3, "maxOutputTokens": 2048]
-        if !store.thinking { g["thinkingConfig"] = ["thinkingBudget": 0] }
+        if !store.geminiThinking { g["thinkingConfig"] = ["thinkingBudget": 0] }
         return g
     }
-    private var timeout: TimeInterval { store.thinking ? 90 : 25 }
+    private var timeout: TimeInterval { store.geminiThinking ? 90 : 25 }
 
     /// 우선 처리를 켰고 글 한 덩어리면 Interactions API 로, 아니면 스트리밍
     func stream(_ body: [String: Any], single: String?, onText: @escaping @MainActor (String) -> Void) async throws -> String {
-        let key = store.apiKey.trimmed, model = store.effectiveModel, thinking = store.thinking
-        if store.priority, !priorityOff, let text = single, !text.isEmpty {
+        let key = store.apiKey.trimmed, model = store.effectiveModel, thinking = store.geminiThinking
+        if store.geminiPriority, !priorityOff, let text = single, !text.isEmpty {
             do {
                 let out = try await Gemini.withRetry { try await Gemini.askPriority(model: model, key: key, text: text, thinking: thinking) }
                 usedPriority = true
@@ -234,7 +234,7 @@ final class TranslatorModel: ObservableObject {
         // 기기 안 PLaMo — 글 번역만. 사진이 붙으면 Gemini 로 간다.
         if store.engine == "plamo" && attachedData == nil {
             guard TLPlamoEngine.compiled else { error = "이 빌드에는 기기 안 번역 엔진이 없어요."; return }
-            guard TLPlamo.shared.installed else { error = "PLaMo 모델 파일이 없어요. 설정 → 번역에서 가져와 주세요."; return }
+            guard TLPlamoFiles.installed else { error = "PLaMo 모델 파일이 없어요. 설정 → 번역에서 가져와 주세요."; return }
             translatePlamo(text)
             return
         }
@@ -352,8 +352,9 @@ final class TranslatorModel: ObservableObject {
         let pairs = store.glossary(tgtLang)
         let prompt = TLPlamoPrompt.build(text: parsed.body, src: sLang, tgt: outL,
                                          form: TLPlamoPrompt.form(tone: tone, outLang: outL),
+                                         context: plamoContext(parsed.reqs),
                                          glossary: TLPlamoPrompt.glossary(pairs, text: parsed.body, toKO: toKO))
-        if !TLPlamoEngine.shared.isLoaded { show("기기 안 모델을 올리는 중이에요") }
+        if !TLPlamoEngine.shared.isLoaded() { show("기기 안 모델을 올리는 중이에요") }
 
         let draw: @MainActor (String) -> Void = { [weak self] full in
             guard let self, my == self.reqSeq else { return }
@@ -366,7 +367,7 @@ final class TranslatorModel: ObservableObject {
             guard let self else { return }
             defer { if my == self.reqSeq { self.busy = false; self.streaming = false } }
             do {
-                let raw = try await TLPlamoEngine.shared.translate(path: TLPlamo.modelURL.path, prompt: prompt) { partial in
+                let raw = try await TLPlamoEngine.shared.translate(prompt: prompt) { partial in
                     DispatchQueue.main.async { MainActor.assumeIsolated { draw(partial) } }
                 }.trimmed
                 guard my == self.reqSeq, !Task.isCancelled else { return }
@@ -396,6 +397,35 @@ final class TranslatorModel: ObservableObject {
             }
         }
         TLHaptic.start()
+    }
+
+    /// PLaMo 는 말투 지시를 따로 받지 않는다. 대신 '참고 문맥(context)'에 말투·상황을 적어 넘긴다.
+    /// 일본어 정중/반말은 form 으로 따로 넘기고, 여기선 그 밖의 말투·캐릭터·추가 요청을 적는다.
+    private func plamoContext(_ reqs: [String]) -> String? {
+        guard srcLang == "ko" else { return nil }   // 외국어 → 한국어는 Gemini 판도 원문 말투를 그대로 살린다
+        var parts: [String] = []
+        let target = TLLang.cfg(tgtLang).label
+        switch tone {
+        case "none", "formal": break
+        case "young_male": parts.append("20대 남성이 친한 친구에게 편하게 반말로 하는 대화입니다. 1인칭은 俺 또는 僕를 씁니다.")
+        case "adult": parts.append("성인들 사이의 성적인 대화입니다. \(target)에서 실제로 쓰는 은어와 속어를 자연스럽게 씁니다.")
+        case "character":
+            let p = store.charPrompt.trimmed
+            if !p.isEmpty { parts.append("말하는 사람(캐릭터) 설명: " + p) }
+        default:
+            if let t = store.tones.first(where: { $0.id == tone }) {
+                let p = t.prompt.trimmed
+                if p == "USE_CHAR_PROMPT" {
+                    let c = store.charPrompt.trimmed
+                    if !c.isEmpty { parts.append("말하는 사람(캐릭터) 설명: " + c) }
+                } else if !p.isEmpty {
+                    parts.append("말투: " + p)
+                }
+            }
+        }
+        if extraOn, !extraText.trimmed.isEmpty { parts.append("추가 요청: " + extraText.trimmed) }
+        parts.append(contentsOf: reqs.map(\.trimmed).filter { !$0.isEmpty }.map { "요청: " + $0 })
+        return parts.isEmpty ? nil : parts.joined(separator: "\n")
     }
 
     /// 번역이 끝난 뒤 Gemini 에게 코멘트만 받는다. 그사이 다시 번역했거나 피드백으로 바뀌었으면 버린다.

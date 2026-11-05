@@ -28,15 +28,25 @@ extension TranslatorModel {
 
     func toggleBackTranslation() {
         if btText != nil { withAnimation(.snappy(duration: 0.25)) { btOpen.toggle() }; return }
-        guard !result.isEmpty, !btLoading, store.hasKey else { return }
+        // 역번역 엔진: 설정 → 번역 → 기능별 모델. 기기 안 모델이 없으면 Gemini 로.
+        let local = store.engineBack == "plamo" && TLPlamo.shared.ready
+        guard !result.isEmpty, !btLoading, local || store.hasKey else { return }
         btLoading = true
         let src = result, origin = originalText
         let model = store.effectiveModel, key = store.apiKey.trimmed
+        // 번역문(외국어) → 원문 언어(한국어)
+        let back = TLPlamoPrompt.build(text: src, src: outLang, tgt: srcLang)
         Task { [weak self] in
             var text = "역번역을 가져오지 못했어요."
             var warn = "", marks: [String] = []
-            if let bt = try? await Gemini.ask(model: model, key: key, prompt: TLExtras.backTranslatePrompt(src),
-                                              maxTokens: 1024, temperature: 0.1) {
+            let got: String?
+            if local {
+                got = try? await TLPlamoEngine.shared.translate(prompt: back, maxTokens: 1024).trimmed
+            } else {
+                got = try? await Gemini.ask(model: model, key: key, prompt: TLExtras.backTranslatePrompt(src),
+                                            maxTokens: 1024, temperature: 0.1)
+            }
+            if let bt = got, !bt.isEmpty {
                 text = bt
                 let d = TLExtras.divergence(source: origin, bt: bt)
                 warn = d.message; marks = d.marks
@@ -193,7 +203,7 @@ extension TranslatorModel {
         mode = .image
         reqSeq += 1
         let my = reqSeq
-        let thinking = store.thinking
+        let thinking = store.geminiThinking
         var gen: [String: Any] = ["temperature": 0.1, "maxOutputTokens": 4096,
                                   "responseMimeType": "application/json", "responseSchema": TLExtras.overlaySchema]
         if !thinking { gen["thinkingConfig"] = ["thinkingBudget": 0] }

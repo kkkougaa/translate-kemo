@@ -15,6 +15,8 @@ struct TLActionSettings {
     var glossary: [String: String] = [:]
     /// 대상 언어별 금지 표현 원문
     var banned: [String: String] = [:]
+    /// 카드 번역 엔진 — gemini · plamo(기기 안). 본 앱 설정 → 번역 → 기능별 모델
+    var engine = "gemini"
 
     static let defaultModel = "gemini-3.6-flash"
     var effectiveModel: String { model.trimmed.isEmpty ? Self.defaultModel : model.trimmed }
@@ -47,6 +49,7 @@ enum TLActionStore {
         else { s.thinking = d.string(forKey: "tl.thinking") == "1" }
         s.charPrompt = d.string(forKey: "tl.char_prompt_default") ?? ""
         s.lastTgt = valid(d.string(forKey: "tl.last_tgt"))
+        s.engine = d.string(forKey: "tl.engine_ext") ?? "gemini"
         for l in langs {
             if let g = d.string(forKey: "tl.glossary_" + l), !g.isEmpty { s.glossary[l] = g }
             if let b = d.string(forKey: "tl.banned_" + l), !b.isEmpty { s.banned[l] = b }

@@ -36,6 +36,8 @@ final class TLActionModel: ObservableObject {
     @Published private(set) var done = false
     @Published private(set) var empty = false
     @Published private(set) var needKey = false
+    /// 이번 결과를 기기 안 PLaMo 가 만들었나
+    @Published private(set) var usedPlamo = false
     @Published var keyInput = ""
     @Published var toast: String?
 
@@ -97,15 +99,72 @@ final class TLActionModel: ObservableObject {
         translate()
     }
 
+    /// 기기 안 모델을 쓸까 — 설정에서 골랐고, 엔진·모델 파일이 다 있을 때
+    private var useLocal: Bool { settings.engine == "plamo" && TLPlamoEngine.compiled && TLPlamoFiles.installed }
+
     func translate() {
         task?.cancel()
         seq += 1
-        let my = seq
         let text = source.trimmed
         guard !text.isEmpty else { return }
+        if useLocal { translateLocal(text); return }
+        translateGemini(text)
+    }
+
+    /// 기기 안 PLaMo. 메모리가 모자라 못 올리는 등 실패하면 Gemini 로 다시 한다 (키가 있을 때).
+    private func translateLocal(_ text: String) {
+        let my = seq
+        needKey = false
+        busy = true; streaming = false; done = false; usedPlamo = true
+        result = ""; comment = ""; error = ""
+        let s = settings
+        let sLang = srcLang, outL = outLang, toKO = self.toKO
+        let parsed = TLText.parseInput(text)
+        let pairs = Glossary.parse(s.glossary[tgtLang] ?? "")
+        let prompt = TLPlamoPrompt.build(text: parsed.body, src: sLang, tgt: outL,
+                                         glossary: TLPlamoPrompt.glossary(pairs, text: parsed.body, toKO: toKO))
+        task = Task { [weak self] in
+            do {
+                let full = try await TLPlamoEngine.shared.translate(prompt: prompt, profile: .ext) { partial in
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            guard let self, my == self.seq else { return }
+                            self.streaming = true
+                            self.result = partial.trimmedStart
+                        }
+                    }
+                }
+                guard let self, my == self.seq else { return }
+                let clean = TLText.cleanForCopy(Glossary.enforce(TLText.tidyOut(full.trimmed, tgtLang: outL), srcText: parsed.body,
+                                                                 outLang: outL, pairs: pairs, toKO: toKO))
+                if clean.isEmpty { throw GeminiError(message: "번역 결과를 받지 못했습니다.") }
+                self.result = clean
+                self.busy = false
+                self.streaming = false
+                self.done = true
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch is CancellationError {
+            } catch {
+                guard let self, my == self.seq else { return }
+                self.usedPlamo = false
+                if self.settings.hasKey {
+                    self.show("기기 안 번역 실패 — Gemini 로 할게요")
+                    self.translateGemini(text)
+                } else {
+                    self.busy = false
+                    self.streaming = false
+                    self.error = "오류: " + error.localizedDescription
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
+            }
+        }
+    }
+
+    private func translateGemini(_ text: String) {
+        let my = seq
         guard settings.hasKey else { needKey = true; return }
         needKey = false
-        busy = true; streaming = false; done = false
+        busy = true; streaming = false; done = false; usedPlamo = false
         result = ""; comment = ""; error = ""
 
         let s = settings
@@ -256,6 +315,11 @@ struct TLActionView: View {
                 sourceText
                 Divider()
                 resultArea
+                if m.usedPlamo && m.done {
+                    Text("기기 안 PLaMo")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(Color.taText3)
+                }
                 if !m.comment.isEmpty { commentBox }
                 if !m.error.isEmpty {
                     Text(m.error)

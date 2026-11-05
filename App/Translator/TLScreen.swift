@@ -311,6 +311,10 @@ final class TLScreenModel: ObservableObject {
     private var speakers: [String: Int] = [:]
     private var drawPending = false
     private var started = false
+    /// 이번 연결은 받아쓰기만 Soniox 로 하고 번역은 기기 안 PLaMo 로 하나 (연결할 때 정한다)
+    private var localMode = false
+    /// 기기 안 번역은 한 줄씩 차례로 — 앞 줄이 끝나야 다음 줄
+    private var localChain: Task<Void, Never>?
 
     private init() {
         lang = d.string(forKey: "tl.screen_lang") ?? "ja"
@@ -403,14 +407,16 @@ final class TLScreenModel: ObservableObject {
         let key = store.sonioxKey.trimmed
         guard conn == nil else { return }
         guard !key.isEmpty else { error = "설정에서 Soniox 키를 넣어 주세요."; redraw(); return }
+        // 설정 → 번역 → 기능별 모델에서 화면 소리 번역을 PLaMo 로 고르면 Soniox 는 받아쓰기만 한다
+        localMode = store.engineScreen == "plamo" && TLPlamo.shared.ready
         var cfg: [String: Any] = [
             "model": TLSoniox.model,
             "language_hints": [lang],
-            "translation": ["type": "one_way", "target_language": "ko"],
             "enable_speaker_diarization": true,
             "enable_endpoint_detection": true
         ]
-        if let ctx = TLSoniox.context(store.glossary(lang), withTranslation: true) { cfg["context"] = ctx }
+        if !localMode { cfg["translation"] = ["type": "one_way", "target_language": "ko"] }
+        if let ctx = TLSoniox.context(store.glossary(lang), withTranslation: !localMode) { cfg["context"] = ctx }
         let c = TLSonioxConn(key: key, config: cfg)
         c.onTokens = { [weak self] toks in self?.take(toks) }
         c.onFinished = { [weak self, weak c] in
@@ -492,6 +498,30 @@ final class TLScreenModel: ObservableObject {
         lines.append(c)
         lastID = c.id
         if lines.count > 200 { lines.removeFirst(lines.count - 200) }
+        if localMode && c.dst.isEmpty && !c.src.isEmpty { translateLocally(c) }
+        redraw()
+    }
+
+    /// 끝난 줄을 기기 안 PLaMo 로 한국어로 옮긴다. 앞의 두 줄을 참고 문맥으로 같이 넘긴다.
+    /// PIP 로 다른 앱을 보는 동안엔 앱이 뒤에 있어 GPU 를 못 쓴다 — CPU 로 돌린다.
+    private func translateLocally(_ line: TLScreenLine) {
+        let id = line.id
+        let prev = lines.dropLast().suffix(2).map(\.src).joined(separator: "\n")
+        let pairs = TLPlamoPrompt.glossary(store.glossary(lang), text: line.src, toKO: true)
+        let prompt = TLPlamoPrompt.build(text: line.src, src: lang, tgt: "ko", context: prev, glossary: pairs)
+        let before = localChain
+        localChain = Task { [weak self] in
+            await before?.value
+            let out = try? await TLPlamoEngine.shared.translate(prompt: prompt, profile: .background, maxTokens: 512) { partial in
+                DispatchQueue.main.async { MainActor.assumeIsolated { self?.setDst(id, partial) } }
+            }
+            if let out { self?.setDst(id, TLText.cleanForCopy(out.trimmed)) }
+        }
+    }
+
+    private func setDst(_ id: UUID, _ text: String) {
+        guard let k = lines.firstIndex(where: { $0.id == id }) else { return }
+        lines[k].dst = text
         redraw()
     }
 

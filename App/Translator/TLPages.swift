@@ -486,17 +486,23 @@ struct TLSettingsPage: View {
     private var translatePage: some View {
         Form {
             engineSection
-            if store.engine == "plamo" { plamoSection }
+            plamoSection
             Section {
-                LabeledContent("번역 모델") {
+                LabeledContent("Gemini 모델") {
                     TextField(TLStore.defaultModel, text: $store.model)
                         .multilineTextAlignment(.trailing)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
                 Toggle("Thinking 모드", isOn: $store.thinking)
+                    .disabled(store.engine == "plamo")
                 Toggle("우선 처리", isOn: $store.priority)
+                    .disabled(store.engine == "plamo")
                 Toggle("입력 언어 자동 감지", isOn: $store.autoDetect)
+            } footer: {
+                if store.engine == "plamo" {
+                    Text("번역을 PLaMo(기기 안)로 하면 Thinking · 우선 처리는 꺼진 채로 가요 (코멘트·피드백·사진도).")
+                }
             }
             Section {
                 Picker("결과 글자 크기", selection: $rsize) {
@@ -531,20 +537,29 @@ struct TLSettingsPage: View {
 
     // MARK: 번역 엔진
 
+    /// 기능마다 어느 모델을 쓸지
     private var engineSection: some View {
         Section {
-            Picker("번역 엔진", selection: $store.engine) {
-                Text("Gemini").tag("gemini")
-                Text("PLaMo (기기 안)").tag("plamo")
-            }
-            .pickerStyle(.segmented)
+            enginePicker("번역", $store.engine, other: ("gemini", "Gemini"))
+            enginePicker("역번역", $store.engineBack, other: ("gemini", "Gemini"))
+            enginePicker("화면 소리 번역", $store.engineScreen, other: ("soniox", "Soniox"))
+            enginePicker("기본 번역 앱 · 공유 시트", $store.engineExt, other: ("gemini", "Gemini"))
+            LabeledContent("코멘트 · 피드백 · 사진 · 독음", value: "Gemini")
         } header: {
-            Text("번역 엔진")
+            Text("기능별 모델")
         } footer: {
-            Text(store.engine == "plamo"
-                 ? "글 번역은 기기 안에서 끝나요 (인터넷 없이도 돼요). 코멘트·피드백·역번역·사진 번역은 Gemini 가 해요. 말투는 일본어 결과에서 '정중하게'·'20대 남성'만 반영돼요."
-                 : "Gemini API 로 번역해요.")
+            Text("PLaMo 는 기기 안에서 돌아서 빠르고 인터넷이 없어도 돼요. 모델 파일이 없으면 다른 쪽으로 돌아가요. "
+                 + "화면 소리 번역을 PLaMo 로 하면 받아쓰기만 Soniox 가 하고 한국어 번역은 기기 안에서 해요. "
+                 + "말투는 일본어 '정중하게'·'20대 남성'이 확실히 반영되고, 나머지 말투·캐릭터·추가 요청은 참고로만 넘겨요.")
         }
+    }
+
+    private func enginePicker(_ title: String, _ value: Binding<String>, other: (tag: String, label: String)) -> some View {
+        Picker(title, selection: value) {
+            Text(other.label).tag(other.tag)
+            Text("PLaMo").tag("plamo")
+        }
+        .pickerStyle(.menu)
     }
 
     private var plamoSection: some View {
