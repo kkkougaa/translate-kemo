@@ -48,6 +48,8 @@ final class TLStore: ObservableObject {
     @Published var tabLabels: Bool { didSet { d.set(tabLabels, forKey: k("tab_labels")) } }
     /// 말로 입력 엔진: device(기기 안) · soniox
     @Published var dictationEngine: String { didSet { d.set(dictationEngine, forKey: k("dictation_engine")) } }
+    /// 번역 엔진: gemini · plamo(기기 안 PLaMo 3 Translate). 코멘트·피드백·사진은 언제나 Gemini.
+    @Published var engine: String { didSet { d.set(engine, forKey: k("engine")) } }
     @Published var ttsModel: String { didSet { d.set(ttsModel.trimmed, forKey: k("gemini_tts_model")) } }
     @Published var ttsVoice: String { didSet { d.set(ttsVoice, forKey: k("gemini_tts_voice")) } }
     @Published var ttsStyle: String { didSet { d.set(ttsStyle, forKey: k("gemini_tts_style")) } }
@@ -70,6 +72,7 @@ final class TLStore: ObservableObject {
         charPrompt = d.string(forKey: "tl.char_prompt_default") ?? ""
         sonioxKey = d.string(forKey: "tl.soniox_key") ?? ""
         dictationEngine = d.string(forKey: "tl.dictation_engine") ?? "device"
+        engine = d.string(forKey: "tl.engine") ?? "gemini"
         barTint = d.string(forKey: "tl.bar_tint") ?? TLStore.defaultBarTint
         buttonTint = d.string(forKey: "tl.button_tint") ?? ""
         writeTint = d.string(forKey: "tl.write_tint") ?? TLStore.defaultWriteTint

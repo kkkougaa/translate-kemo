@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
 
 // 서랍과 서랍에서 여는 페이지들 (기록 · 용어집 · 설정 · 말투 관리 · 피드백 칩)
@@ -314,6 +315,9 @@ struct TLSettingsPage: View {
     @State private var checking = ""
     @ObservedObject private var audio = TLAudio.shared
     @State private var previewLoading = false
+    @ObservedObject private var plamo = TLPlamo.shared
+    @State private var plamoPicking = false
+    @State private var plamoConfirmDelete = false
 
     /// 고른 목소리·스타일로 짧은 문장을 들려준다
     private func previewVoice() {
@@ -481,6 +485,8 @@ struct TLSettingsPage: View {
 
     private var translatePage: some View {
         Form {
+            engineSection
+            if store.engine == "plamo" { plamoSection }
             Section {
                 LabeledContent("번역 모델") {
                     TextField(TLStore.defaultModel, text: $store.model)
@@ -510,10 +516,81 @@ struct TLSettingsPage: View {
         }
         .tint(.tlAccent)
         .navigationTitle("번역")
+        .fileImporter(isPresented: $plamoPicking, allowedContentTypes: [.data]) { r in
+            if case .success(let url) = r { plamo.importModel(from: url) }
+        }
+        .confirmationDialog("PLaMo 모델 파일을 지울까요?", isPresented: $plamoConfirmDelete, titleVisibility: .visible) {
+            Button("지우기", role: .destructive) { plamo.removeModel() }
+        }
         .onAppear {
             loaded = false
             banned = store.banned(tgtLang)
             DispatchQueue.main.async { loaded = true }
+        }
+    }
+
+    // MARK: 번역 엔진
+
+    private var engineSection: some View {
+        Section {
+            Picker("번역 엔진", selection: $store.engine) {
+                Text("Gemini").tag("gemini")
+                Text("PLaMo (기기 안)").tag("plamo")
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("번역 엔진")
+        } footer: {
+            Text(store.engine == "plamo"
+                 ? "글 번역은 기기 안에서 끝나요 (인터넷 없이도 돼요). 코멘트·피드백·역번역·사진 번역은 Gemini 가 해요. 말투는 일본어 결과에서 '정중하게'·'20대 남성'만 반영돼요."
+                 : "Gemini API 로 번역해요.")
+        }
+    }
+
+    private var plamoSection: some View {
+        Section {
+            if !TLPlamoEngine.compiled {
+                Text("이 빌드에는 기기 안 번역 엔진이 들어 있지 않아요.")
+                    .foregroundStyle(Color.tlRed)
+            }
+            LabeledContent("모델 파일") {
+                Text(plamo.installed ? (plamo.fileName.isEmpty ? "model.gguf" : plamo.fileName) : "없음")
+                    .foregroundStyle(plamo.installed ? Color.primary : Color.tlRed)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            if plamo.installed {
+                LabeledContent("크기") {
+                    Text(ByteCountFormatter.string(fromByteCount: plamo.fileSize, countStyle: .file)
+                         + (plamo.sizeLabel.isEmpty ? "" : " · " + plamo.sizeLabel))
+                }
+            }
+            Button {
+                plamoPicking = true
+            } label: {
+                HStack {
+                    Text(plamo.installed ? "다른 모델로 바꾸기" : "모델 파일 가져오기")
+                    Spacer()
+                    if plamo.importing { ProgressView() }
+                }
+            }
+            .disabled(plamo.importing)
+            if let msg = plamo.message {
+                Text(msg).font(.system(size: 14)).foregroundStyle(Color.tlText2)
+            }
+            if plamo.installed {
+                Button("모델 지우기", role: .destructive) { plamoConfirmDelete = true }
+                    .disabled(plamo.importing)
+            }
+        } header: {
+            Text("PLaMo 3 Translate")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Hugging Face 에서 GGUF 파일을 받아 파일 앱에 저장한 뒤 가져오세요. 앱 안으로 복사하니 가져온 뒤엔 원본을 지워도 돼요.")
+                Text("추천: plamo-3-translate-2b-GGUF 의 Q4_K_M (1.81GB). 가볍게: 0.8b-GGUF 의 Q4_K_M (0.57GB).")
+                Link("Hugging Face 에서 받기", destination: TLPlamo.collectionURL)
+                Text("PLaMo Community License — 개인·비상업 이용은 무료예요.")
+            }
         }
     }
 

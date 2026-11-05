@@ -44,6 +44,8 @@ final class TranslatorModel: ObservableObject {
     @Published var error = ""
     @Published var succeeded = false
     @Published var usedPriority = false
+    /// 이번 결과를 기기 안 PLaMo 가 만들었나
+    @Published var usedPlamo = false
     @Published var fbMessages: [FbMsg] = []
     @Published var fbBusy = false
     @Published var toast: String?
@@ -163,7 +165,7 @@ final class TranslatorModel: ObservableObject {
 
     func clearResult() {
         result = ""; comment = ""; error = ""; succeeded = false
-        conversation = []; fbMessages = []; usedPriority = false
+        conversation = []; fbMessages = []; usedPriority = false; usedPlamo = false
         mode = .translate
         resetExtras()
     }
@@ -229,10 +231,17 @@ final class TranslatorModel: ObservableObject {
     func translate() {
         let text = input.trimmed
         guard !text.isEmpty || attachedData != nil, !busy else { return }
+        // 기기 안 PLaMo — 글 번역만. 사진이 붙으면 Gemini 로 간다.
+        if store.engine == "plamo" && attachedData == nil {
+            guard TLPlamoEngine.compiled else { error = "이 빌드에는 기기 안 번역 엔진이 없어요."; return }
+            guard TLPlamo.shared.installed else { error = "PLaMo 모델 파일이 없어요. 설정 → 번역에서 가져와 주세요."; return }
+            translatePlamo(text)
+            return
+        }
         guard store.hasKey else { error = "설정에서 Gemini API 키를 넣어주세요."; return }
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 
-        busy = true; streaming = false; error = ""; usedPriority = false; succeeded = false
+        busy = true; streaming = false; error = ""; usedPriority = false; usedPlamo = false; succeeded = false
         result = ""; comment = ""; fbMessages = []; conversation = []
         mode = .translate
         resetExtras()
@@ -324,6 +333,83 @@ final class TranslatorModel: ObservableObject {
             }
         }
         TLHaptic.start()
+    }
+
+    // MARK: 기기 안 번역 (PLaMo)
+
+    /// PLaMo 가 번역하고, 코멘트는 Gemini 가 뒤이어 붙인다 (키가 있을 때만). 피드백도 Gemini 로 이어진다.
+    private func translatePlamo(_ text: String) {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        busy = true; streaming = false; error = ""; usedPriority = false; usedPlamo = true; succeeded = false
+        result = ""; comment = ""; fbMessages = []; conversation = []
+        mode = .translate
+        resetExtras()
+        reqSeq += 1
+        let my = reqSeq
+        let outL = outLang, sLang = srcLang, tLang = tgtLang, toKO = self.toKO
+        let srcName = toKO ? TLLang.cfg(tgtLang).label : "한국어", oName = outName
+        let parsed = TLText.parseInput(text)
+        let pairs = store.glossary(tgtLang)
+        let prompt = TLPlamoPrompt.build(text: parsed.body, src: sLang, tgt: outL,
+                                         form: TLPlamoPrompt.form(tone: tone, outLang: outL),
+                                         glossary: TLPlamoPrompt.glossary(pairs, text: parsed.body, toKO: toKO))
+        if !TLPlamoEngine.shared.isLoaded { show("기기 안 모델을 올리는 중이에요") }
+
+        let draw: @MainActor (String) -> Void = { [weak self] full in
+            guard let self, my == self.reqSeq else { return }
+            if !self.streaming { TLHaptic.tick() }
+            self.streaming = true
+            self.result = full.trimmedStart
+        }
+
+        task = Task { [weak self] in
+            guard let self else { return }
+            defer { if my == self.reqSeq { self.busy = false; self.streaming = false } }
+            do {
+                let raw = try await TLPlamoEngine.shared.translate(path: TLPlamo.modelURL.path, prompt: prompt) { partial in
+                    DispatchQueue.main.async { MainActor.assumeIsolated { draw(partial) } }
+                }.trimmed
+                guard my == self.reqSeq, !Task.isCancelled else { return }
+                if raw.isEmpty { throw GeminiError(message: "번역 결과를 받지 못했습니다.") }
+                let tidy = Glossary.enforce(TLText.tidyOut(raw, tgtLang: outL), srcText: parsed.body,
+                                            outLang: outL, pairs: pairs, toKO: toKO)
+                let clean = TLText.cleanForCopy(tidy)
+                self.store.saveHistory(src: text, tgt: clean, srcLang: sLang, tgtLang: tLang)
+                self.originalText = parsed.body
+                // 피드백은 Gemini 로 — 같은 시작 대화를 깔아 둔다
+                self.conversation = [
+                    ["role": "user", "parts": [["text": TLPrompt.feedbackSystem(source: parsed.body, result: clean)]]],
+                    ["role": "model", "parts": [["text": "네, 번역 결과를 기억했습니다. 수정 요청을 말씀해주세요."]]]
+                ]
+                self.result = clean
+                self.comment = ""
+                self.fbMessages = []
+                self.succeeded = true
+                TLHaptic.done()
+                if sLang == "ko" { self.toggleBackTranslation() }
+                self.fetchPlamoComment(my: my, source: parsed.body, result: clean, srcName: srcName, tgtName: oName)
+            } catch is CancellationError {
+            } catch {
+                guard my == self.reqSeq else { return }
+                self.error = "오류: " + error.localizedDescription
+                TLHaptic.error()
+            }
+        }
+        TLHaptic.start()
+    }
+
+    /// 번역이 끝난 뒤 Gemini 에게 코멘트만 받는다. 그사이 다시 번역했거나 피드백으로 바뀌었으면 버린다.
+    private func fetchPlamoComment(my: Int, source: String, result: String, srcName: String, tgtName: String) {
+        guard store.hasKey else { return }
+        let model = store.effectiveModel, key = store.apiKey.trimmed
+        let prompt = TLPrompt.plamoComment(source: source, result: result, srcName: srcName, tgtName: tgtName)
+        Task { [weak self] in
+            guard let out = try? await Gemini.ask(model: model, key: key, prompt: prompt, maxTokens: 400, temperature: 0.2) else { return }
+            let c = out.trimmed
+            guard let self, my == self.reqSeq, self.result == result, self.fbMessages.isEmpty else { return }
+            if c.isEmpty || c.hasPrefix(TLPrompt.noComment) && c.count <= TLPrompt.noComment.count + 2 { return }
+            withAnimation(.snappy(duration: 0.25)) { self.comment = c }
+        }
     }
 
     // MARK: 피드백

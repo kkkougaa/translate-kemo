@@ -6,6 +6,9 @@
 
 - 번들 ID `com.kouga.kemotranslate`, 앱 그룹 `group.com.kouga.kemotranslate`
 - Gemini(번역·독음·사전·TTS·사진), Soniox(대화 모드·화면 소리 번역·말로 입력) — 키는 이용자가 직접 넣는다
+- 기기 안 번역: [PLaMo 3 Translate](https://huggingface.co/collections/pfnet/plamo-3-translate) (PLaMo Community License).
+  앱엔 엔진(llama.cpp, CI 가 `.github/scripts/fetch_llama.sh` 로 받음)만 넣고, 모델 `.gguf` 는 설정 → 번역에서 파일로 가져온다.
+  추천 2B Q4_K_M(1.81GB), 가볍게 0.8B Q4_K_M(0.57GB). 코멘트·피드백·역번역·사진은 그대로 Gemini.
 
 ## 빌드 · 배포
 
@@ -33,6 +36,7 @@ App/
     TLStore                설정·기록 (UserDefaults 'tl.' + 웹 판 localStorage 키 이름)
     TranslatorModel / View 번역 화면, TLTabBar 하단 글래스 바, TLPages 서랍·기록·용어집·설정
     TLScreen*              화면 소리 번역 (방송 확장 → Soniox → PIP 자막)
+    TLPlamo                기기 안 번역 — PLaMo 3 Translate GGUF 를 llama.cpp 로 (모델 파일은 설정에서 가져온다)
     TLTalk · TLStudy · TLWords · TLBackup   대화 모드 · 공부 · 표현 노트 · 백업
   Assets.xcassets          앱 아이콘, PIP 자막·카드에 쓰는 logo
   PrivacyInfo.xcprivacy    개인정보 매니페스트

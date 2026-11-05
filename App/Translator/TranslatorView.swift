@@ -828,8 +828,9 @@ struct TranslatorView: View {
     private var metaPills: some View {
         let pol = m.politeness
         let sugs = m.glossarySuggestions
-        if !pol.isEmpty || m.usedPriority || !m.btWarn.isEmpty || !sugs.isEmpty {
+        if !pol.isEmpty || m.usedPriority || m.usedPlamo || !m.btWarn.isEmpty || !sugs.isEmpty {
             TLFlow(spacing: 5) {
+                if m.usedPlamo { pill("기기 안 PLaMo") }
                 if !pol.isEmpty { pill(pol) }
                 if m.usedPriority { pill("우선 처리") }
                 if !m.btWarn.isEmpty {

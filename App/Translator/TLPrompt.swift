@@ -228,6 +228,22 @@ enum TLPrompt {
         return out
     }
 
+    /// 기기 안(PLaMo) 번역 뒤 Gemini 에게 코멘트만 받는다. 번역은 다시 하지 않는다.
+    static let noComment = "없음"
+    static func plamoComment(source: String, result: String, srcName: String, tgtName: String) -> String {
+        """
+        아래는 \(srcName)를 \(tgtName)로 옮긴 기계 번역입니다. 번역을 다시 하지 마세요.
+        읽는 사람이 알아두면 좋은 점(뉘앙스 차이, 오역 가능성, 원문에 없는 말·빠진 말, 문화적 맥락)이 있을 때만
+        한국어로 1~3줄 짧게 적어주세요. 특별히 없으면 "\(noComment)" 한 단어만 출력하세요.
+
+        [원문]
+        \(source)
+
+        [번역]
+        \(result)
+        """
+    }
+
     static func feedbackSystem(source: String, result: String) -> String {
         """
         당신은 번역 수정 도우미입니다. 아래는 원문과 번역 결과입니다.

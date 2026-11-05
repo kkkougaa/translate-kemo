@@ -53,6 +53,9 @@ jobs:
       - name: XcodeGen 설치
         run: brew install xcodegen
 
+      - name: llama.cpp 받기 (기기 안 번역 엔진)
+        run: .github/scripts/fetch_llama.sh
+
       - name: 프로젝트 생성
         run: xcodegen generate --spec project.yml
 
@@ -106,6 +109,9 @@ jobs:
 
       - name: XcodeGen 설치
         run: brew install xcodegen
+
+      - name: llama.cpp 받기 (기기 안 번역 엔진)
+        run: .github/scripts/fetch_llama.sh
 
       - name: 프로젝트 생성
         run: xcodegen generate --spec project.yml

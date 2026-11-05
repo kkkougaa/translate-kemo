@@ -6,3 +6,6 @@ Payload/
 *.ipa
 *.log
 .DS_Store
+
+# llama.cpp xcframework — CI 가 .github/scripts/fetch_llama.sh 로 받는다
+Vendor/

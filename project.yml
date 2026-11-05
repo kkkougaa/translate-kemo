@@ -39,6 +39,9 @@ targets:
       - target: TranslateKemoTranslate
         embed: true
         codeSign: false
+      # 기기 안 번역 엔진 (llama.cpp). CI 가 .github/scripts/fetch_llama.sh 로 받아 둔다
+      - framework: Vendor/llama.xcframework
+        embed: true
     info:
       path: App/Info.plist
       properties:
