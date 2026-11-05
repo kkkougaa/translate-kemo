@@ -2,6 +2,8 @@
 #   build      : 컴파일 확인. translate 등 main 이 아닌 브랜치는 여기서 끝 (무서명, ipa 안 만듦)
 #   testflight : main 에 합치면 정식 서명해서 TestFlight 에 올린다.
 #                App Store Connect API 키가 저장소 Secrets 에 아직 없으면 무서명 ipa 만 아티팩트로 남긴다.
+#   review     : 손으로 실행(Actions → Build · TestFlight → Run workflow)하면 어느 브랜치든
+#                빌드 → TestFlight 업로드 → 처리 기다리기 → 외부 테스트 그룹에 넣고 베타 심사 제출까지 한다.
 #
 # 필요한 Secrets (Settings → Secrets and variables → Actions)
 #   ASC_KEY_ID      App Store Connect 팀 API 키의 키 ID
@@ -10,16 +12,31 @@
 #   APPLE_TEAM_ID   개발자 계정 팀 ID (10자리)
 #   P12_BASE64      (선택) 배포 인증서 .p12 를 base64 로 바꾼 것
 #   P12_PASSWORD    (선택) 그 .p12 의 비밀번호
+#   BETA_CONTACT_FIRST · BETA_CONTACT_LAST · BETA_CONTACT_PHONE · BETA_CONTACT_EMAIL
+#                   (선택) 베타 심사 연락처. App Store Connect TestFlight '테스트 정보'에 이미 있으면 필요 없다
 name: Build · TestFlight
 
 on:
   push:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      review:
+        description: "외부 테스트 심사까지 제출"
+        type: boolean
+        default: true
+      group:
+        description: "외부 테스트 그룹 이름 (없으면 만든다)"
+        type: string
+        default: "테스터"
+      whats_new:
+        description: "테스트할 내용 (비우면 마지막 커밋 제목)"
+        type: string
+        default: ""
 
 jobs:
   build:
-    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+    if: github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -73,7 +90,7 @@ jobs:
           path: build.log
 
   testflight:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -287,7 +304,7 @@ jobs:
   processing:
     needs: testflight
     # 업로드에 실패해도 지금까지 올라간 빌드 목록은 본다
-    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -305,3 +322,42 @@ jobs:
           { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$BODY" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$KEY"
           pip install -q pyjwt cryptography
           python3 .github/scripts/asc_builds.py "$KEY" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate "${{ github.run_number }}" ${{ needs.testflight.result == 'success' && 30 || 0 }}
+
+  # 손으로 실행했을 때만 — 처리 끝난 빌드를 외부 테스트 그룹에 넣고 베타 앱 심사에 낸다
+  review:
+    needs: [testflight, processing]
+    if: github.event_name == 'workflow_dispatch' && inputs.review && needs.testflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 테스트할 내용 정하기
+        id: notes
+        env:
+          WHATS_NEW: ${{ inputs.whats_new }}
+        run: |
+          if [ -n "$WHATS_NEW" ]; then NOTE="$WHATS_NEW"; else NOTE=$(git log -1 --format=%s); fi
+          { echo "text<<__END__"; printf '%s\n' "$NOTE"; echo "__END__"; } >> "$GITHUB_OUTPUT"
+
+      - name: 외부 테스트 심사 제출
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BETA_CONTACT_FIRST: ${{ secrets.BETA_CONTACT_FIRST }}
+          BETA_CONTACT_LAST: ${{ secrets.BETA_CONTACT_LAST }}
+          BETA_CONTACT_PHONE: ${{ secrets.BETA_CONTACT_PHONE }}
+          BETA_CONTACT_EMAIL: ${{ secrets.BETA_CONTACT_EMAIL }}
+          GROUP: ${{ inputs.group }}
+          NOTE: ${{ steps.notes.outputs.text }}
+        run: |
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_P8" ]; then
+            echo "::error::App Store Connect API 키가 Secrets 에 없어서 심사에 낼 수 없다"; exit 1
+          fi
+          KEY="$RUNNER_TEMP/AuthKey.p8"
+          BODY=$(printf '%s' "$ASC_KEY_P8" | tr -d '\r' | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \n\t')
+          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$BODY" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$KEY"
+          pip install -q pyjwt cryptography
+          python3 .github/scripts/asc_beta_review.py "$KEY" "$ASC_KEY_ID" "$ASC_ISSUER_ID" com.kouga.kemotranslate \
+            "${{ github.run_number }}" "${GROUP:-테스터}" "$NOTE"

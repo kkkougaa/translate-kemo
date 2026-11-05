@@ -15,6 +15,11 @@
   `ASC_KEY_ID` · `ASC_ISSUER_ID` · `ASC_KEY_P8`(App Store Connect 팀 API 키 .p8 내용 전체) · `APPLE_TEAM_ID`.
   없으면 무서명 ipa 만 아티팩트로 남긴다.
 - 그 밖의 브랜치는 컴파일 확인만 한다.
+- **손으로 실행**(Actions → Build · TestFlight → Run workflow, 브랜치 고르기)하면 그 브랜치를
+  빌드 → TestFlight 업로드 → 처리 기다리기 → 외부 테스트 그룹(기본 `테스터`, 없으면 만든다)에 넣고
+  **베타 앱 심사 제출**까지 한다. '테스트할 내용'은 입력칸, 비우면 마지막 커밋 제목.
+  베타 심사 연락처가 App Store Connect(TestFlight → 테스트 정보)에 없으면 Secrets
+  `BETA_CONTACT_FIRST` · `BETA_CONTACT_LAST` · `BETA_CONTACT_PHONE` · `BETA_CONTACT_EMAIL` 로 채운다.
 
 ## 구조
 
