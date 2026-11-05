@@ -224,7 +224,8 @@ struct TranslatorView: View {
         .padding(.top, 2)
     }
 
-    /// 번역 엔진 고르기 — 속어처럼 문맥이 중요한 글은 Gemini 가 나을 때가 있어서 바로 바꿀 수 있게
+    /// 번역 엔진 고르기 — 속어처럼 문맥이 중요한 글은 Gemini 가 나을 때가 있어서 바로 바꿀 수 있게.
+    /// 기능별 모델 전체를 같이 바꾼다. 배지는 '번역' 기능의 엔진을 보여 준다.
     private var engineMenu: some View {
         Menu {
             Picker("번역 엔진", selection: Binding(get: { store.engine }, set: { pickEngine($0) })) {
@@ -257,7 +258,14 @@ struct TranslatorView: View {
             return
         }
         TLHaptic.select()
-        withAnimation(.snappy(duration: 0.25)) { store.engine = e }
+        // 위에서 바꾸면 설정 → 기능별 모델을 통째로 바꾼다 (코멘트·피드백·사진·독음은 언제나 Gemini)
+        withAnimation(.snappy(duration: 0.25)) {
+            store.engine = e
+            store.engineBack = e
+            store.engineExt = e
+            store.engineScreen = e == "plamo" ? "plamo" : "soniox"
+        }
+        m.show(e == "plamo" ? "기기 안 PLaMo 로 바꿨어요" : "Gemini 로 바꿨어요")
     }
 
     // MARK: 언어 바

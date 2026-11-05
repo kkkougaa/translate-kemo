@@ -124,19 +124,25 @@ final class TLPlamo: ObservableObject {
 
 // MARK: 엔진 배지 (메인 화면 위 드롭다운)
 
-/// 지금 번역 엔진 — Gemini 는 로고 + 이름, PLaMo 는 로고 글자
+/// 지금 번역 엔진 — 로고 + 이름
 struct TLEngineBadge: View {
     let engine: String
     var height: CGFloat = 15
 
     var body: some View {
         if engine == "plamo" {
-            Image("plamo")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(height: height - 2)
-                .accessibilityLabel("PLaMo")
+            HStack(spacing: 5) {
+                Image("plamo")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(height: height - 5)
+                Text("PLaMo")
+                    .font(.system(size: height, weight: .semibold))
+                    .tracking(-0.3)
+                    .foregroundStyle(Color.primary)
+            }
+            .accessibilityElement(children: .combine)
         } else {
             HStack(spacing: 4) {
                 Image("gemini")
