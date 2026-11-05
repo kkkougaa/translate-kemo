@@ -21,8 +21,6 @@ struct TranslatorView: View {
     @State private var visited: Set<TLTab> = [.home]
     /// 쓰기 버튼 → 번역 화면 맨 위로
     @State private var scrollTopTick = 0
-    /// 키보드가 떠 있으면 하단 바가 그 뒤로 숨으니 바 자리를 비우지 않는다
-    @State private var keyboardUp = false
     @State private var drawerOpen = false
     @State private var optOpen = false
     @State private var fbText = ""
@@ -67,17 +65,9 @@ struct TranslatorView: View {
                      onWrite: write, onTranslate: { m.translateOrCancel() },
                      onMenu: { focus = nil; drawerOpen = true })
                 .ignoresSafeArea(barMode == .translate ? [] : .keyboard)
-                // 피드백 칸처럼 번역 입력칸이 아닌 곳에 키보드가 떠 있으면 바를 아예 숨긴다.
-                // 그동안은 화면도 바 자리를 안 비우니(tlBarSpace 0) 떠 있으면 아래 버튼을 가린다.
-                .opacity(barHidden ? 0 : 1)
-                .allowsHitTesting(!barHidden)
-                .accessibilityHidden(barHidden)
                 .animation(.spring(duration: 0.45, bounce: 0.22), value: barMode)
-                .animation(.easeOut(duration: 0.18), value: barHidden)
         }
         .onChange(of: tab) { _, t in visited.insert(t) }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
         .overlay {
             TLDrawer(open: $drawerOpen) { route in
                 if route == .settings { tab = .settings } else { tab = .home; path = [route] }
@@ -92,7 +82,7 @@ struct TranslatorView: View {
     private func tabPage<V: View>(_ t: TLTab, @ViewBuilder _ content: () -> V) -> some View {
         if visited.contains(t) {
             content()
-                .environment(\.tlBarSpace, keyboardUp || focus != nil ? 0 : TLTabBar.height + 8)
+                .environment(\.tlBarSpace, barSpace)
                 .opacity(tab == t ? 1 : 0)
                 .allowsHitTesting(tab == t)
                 .accessibilityHidden(tab != t)
@@ -106,9 +96,11 @@ struct TranslatorView: View {
         return barCollapsed ? .write : .full
     }
 
-    /// 번역 버튼으로 키보드 위에 올라온 때 말고, 키보드가 떠 있거나 다른 칸을 쓰는 동안엔 바를 숨긴다
-    private var barHidden: Bool {
-        barMode != .translate && (keyboardUp || focus != nil)
+    /// 화면 아래에 비울 바 자리. 키보드가 떠 있어도 바(접힌 노란 쓰기 버튼 포함)는 키보드 위에 남아 있어서
+    /// 자리를 그대로 비운다 — 안 비우면 피드백 칸의 보내기 버튼 같은 아래 버튼을 가린다.
+    /// 번역 입력칸을 누른 때만 빼는데, 그땐 번역 버튼이 입력 카드(화면 위쪽)와 안 겹친다.
+    private var barSpace: CGFloat {
+        barMode == .translate ? 0 : TLTabBar.height + 8
     }
 
     /// 쓰기 버튼 — 번역 화면 맨 위로 올라가 입력칸에 키보드를 연다
