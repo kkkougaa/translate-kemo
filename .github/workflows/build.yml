@@ -1,9 +1,10 @@
 # 맥 없이 빌드하기.
-#   build      : 컴파일 확인. translate 등 main 이 아닌 브랜치는 여기서 끝 (무서명, ipa 안 만듦)
-#   testflight : main 에 합치면 정식 서명해서 TestFlight 에 올린다.
+#   build      : 푸시(main 포함)하면 컴파일 확인만 한다 (무서명, ipa 안 만듦)
+#   testflight : 손으로 실행(Actions → Build · TestFlight → Run workflow)할 때만 — 고른 브랜치를
+#                정식 서명해서 TestFlight 에 올린다.
 #                App Store Connect API 키가 저장소 Secrets 에 아직 없으면 무서명 ipa 만 아티팩트로 남긴다.
-#   review     : 손으로 실행(Actions → Build · TestFlight → Run workflow)하면 어느 브랜치든
-#                빌드 → TestFlight 업로드 → 처리 기다리기 → 외부 테스트 그룹에 넣고 베타 심사 제출까지 한다.
+#   processing : 올린 빌드의 애플 처리를 기다린다
+#   review     : 처리가 끝나면 외부 테스트 그룹에 넣고 베타 앱 심사에 낸다 ('심사까지 제출'을 끄면 건너뛴다)
 #
 # 필요한 Secrets (Settings → Secrets and variables → Actions)
 #   ASC_KEY_ID      App Store Connect 팀 API 키의 키 ID
@@ -36,7 +37,7 @@ on:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -90,7 +91,7 @@ jobs:
           path: build.log
 
   testflight:
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 45
     steps:
@@ -304,7 +305,7 @@ jobs:
   processing:
     needs: testflight
     # 업로드에 실패해도 지금까지 올라간 빌드 목록은 본다
-    if: always() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: always() && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
