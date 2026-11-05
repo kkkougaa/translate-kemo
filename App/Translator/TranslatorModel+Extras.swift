@@ -206,7 +206,7 @@ extension TranslatorModel {
         let thinking = store.geminiThinking
         var gen: [String: Any] = ["temperature": 0.1, "maxOutputTokens": 4096,
                                   "responseMimeType": "application/json", "responseSchema": TLExtras.overlaySchema]
-        if !thinking { gen["thinkingConfig"] = ["thinkingBudget": 0] }
+        if !thinking { gen["thinkingConfig"] = Gemini.thinkingOff(store.effectiveModel) }
         let parts: [[String: Any]] = [
             ["inline_data": ["mime_type": attachedMime, "data": data.base64EncodedString()]],
             ["text": TLExtras.overlayPrompt(tgtName: outName)]

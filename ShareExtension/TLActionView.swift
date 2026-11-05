@@ -117,7 +117,7 @@ final class TLActionModel: ObservableObject {
         let prompt = TLPrompt.build(text, ctx)
         let parsed = TLText.parseInput(text)
         var gen: [String: Any] = ["temperature": 0.3, "maxOutputTokens": 2048]
-        if !s.thinking { gen["thinkingConfig"] = ["thinkingBudget": 0] }
+        if !s.thinking { gen["thinkingConfig"] = Gemini.thinkingOff(s.effectiveModel) }
         let body: [String: Any] = ["contents": [["parts": [["text": prompt]]]], "generationConfig": gen]
         let timeout: TimeInterval = s.thinking ? 90 : 25
         let model = s.effectiveModel, key = s.apiKey.trimmed

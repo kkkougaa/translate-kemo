@@ -16,7 +16,7 @@ struct TLActionSettings {
     /// 대상 언어별 금지 표현 원문
     var banned: [String: String] = [:]
 
-    static let defaultModel = "gemini-3.6-flash"
+    static let defaultModel = "gemini-3.8-flash"
     var effectiveModel: String { model.trimmed.isEmpty ? Self.defaultModel : model.trimmed }
     var hasKey: Bool { !apiKey.trimmed.isEmpty }
 }

@@ -204,7 +204,7 @@ final class TranslatorModel: ObservableObject {
 
     var genCfg: [String: Any] {
         var g: [String: Any] = ["temperature": 0.3, "maxOutputTokens": 2048]
-        if !store.geminiThinking { g["thinkingConfig"] = ["thinkingBudget": 0] }
+        if !store.geminiThinking { g["thinkingConfig"] = Gemini.thinkingOff(store.effectiveModel) }
         return g
     }
     private var timeout: TimeInterval { store.geminiThinking ? 90 : 25 }

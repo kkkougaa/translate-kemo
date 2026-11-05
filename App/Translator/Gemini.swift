@@ -106,12 +106,26 @@ enum Gemini {
         return full
     }
 
+    // MARK: Thinking 끄기
+
+    /// Thinking 을 끈 상태를 모델에 맞게 만든다 (켜면 아무것도 안 보내서 모델 기본값 — 3.x 는 medium).
+    /// · Gemini 3 이후: thinkingLevel 의 가장 낮은 단계. 3.8 Flash · 4 는 minimal 이 없어(보내면 에러) low, 그 밖엔 minimal
+    /// · Gemini 1.x · 2.x: 예전 thinkingBudget 0
+    static func lowestThinkingLevel(_ model: String) -> String {
+        model.lowercased().rxTest("gemini-(3\\.8|[4-9])") ? "low" : "minimal"
+    }
+
+    static func thinkingOff(_ model: String) -> [String: Any] {
+        if model.lowercased().rxTest("gemini-(1|2)\\.") { return ["thinkingBudget": 0] }
+        return ["thinkingLevel": lowestThinkingLevel(model)]
+    }
+
     /// 한 번에 받는 호출 (독음·사전·공부 등)
     static func ask(model: String, key: String, prompt: String, maxTokens: Int = 1024, temperature: Double = 0.4,
                     thinking: Bool = false) async throws -> String {
         try await withRetry {
             var gen: [String: Any] = ["temperature": temperature, "maxOutputTokens": maxTokens]
-            if !thinking { gen["thinkingConfig"] = ["thinkingBudget": 0] }
+            if !thinking { gen["thinkingConfig"] = thinkingOff(model) }
             let body: [String: Any] = [
                 "contents": [["parts": [["text": prompt]]]],
                 "generationConfig": gen
@@ -160,7 +174,7 @@ enum Gemini {
     /// store:false 로 주고받은 글을 구글 쪽에 남기지 않는다.
     static func askPriority(model: String, key: String, text: String, thinking: Bool) async throws -> String {
         var gen: [String: Any] = ["max_output_tokens": 2048]
-        if !thinking { gen["thinking_level"] = "minimal" }
+        if !thinking { gen["thinking_level"] = lowestThinkingLevel(model) }
         let body: [String: Any] = ["model": model, "input": text, "service_tier": "priority",
                                    "store": false, "generation_config": gen]
         let req = try request("https://generativelanguage.googleapis.com/v1beta/interactions", key: key, body: body, timeout: 60)

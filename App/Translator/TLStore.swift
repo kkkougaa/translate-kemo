@@ -9,7 +9,10 @@ import UIKit
 @MainActor
 final class TLStore: ObservableObject {
     static let shared = TLStore()
-    static let defaultModel = "gemini-3.6-flash"
+    static let defaultModel = "gemini-3.8-flash"
+    /// 예전 기본값 — 이걸 그대로 적어 둔 사람은 새 기본값을 따라오게 비운다 (웹 판과 같다)
+    static let legacyDefaultModels: Set<String> = ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash-lite",
+                                                    "gemini-2.0-flash", "gemini-1.5-flash"]
     private let d = UserDefaults.standard
     private func k(_ key: String) -> String { "tl." + key }
 
@@ -66,7 +69,9 @@ final class TLStore: ObservableObject {
 
     private init() {
         apiKey = d.string(forKey: "tl.gemini_api_key") ?? ""
-        model = d.string(forKey: "tl.gemini_model") ?? ""
+        let savedModel = d.string(forKey: "tl.gemini_model") ?? ""
+        model = TLStore.legacyDefaultModels.contains(savedModel.trimmed) ? "" : savedModel
+        if model.isEmpty { d.removeObject(forKey: "tl.gemini_model") }
         thinking = d.bool(forKey: "tl.thinking")
         priority = d.string(forKey: "tl.gemini_priority") == "1"
         autoDetect = d.string(forKey: "tl.auto_detect") != "0"
