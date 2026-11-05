@@ -194,18 +194,6 @@ struct TLScreenPage: View {
             .frame(minHeight: 48)
             Divider().padding(.leading, 16)
             HStack {
-                Text("이전 대화").font(.system(size: 16))
-                Spacer()
-                Picker("이전 대화", selection: $m.history) {
-                    ForEach([0, 1, 2, 3, 5], id: \.self) { n in Text(n == 0 ? "없음" : "\(n)").tag(n) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-            }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 48)
-            Divider().padding(.leading, 16)
-            HStack {
                 Text("글꼴").font(.system(size: 16))
                 Spacer()
                 Picker("글꼴", selection: $m.captionFont) {

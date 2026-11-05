@@ -287,8 +287,6 @@ final class TLScreenModel: ObservableObject {
     @Published var fontScale: Double { didSet { d.set(fontScale, forKey: "tl.screen_fs"); redraw() } }
     /// 자막 창 모양: 기본(4:3) · 가로로 길게(화면 위에 띠처럼)
     @Published var wide: Bool { didSet { d.set(wide, forKey: "tl.screen_wide"); redraw() } }
-    /// 지금 말 위에 이전 대화를 몇 줄까지 남기나
-    @Published var history: Int { didSet { d.set(history, forKey: "tl.screen_hist"); redraw() } }
     /// 자막 테마 — 글꼴(default·rounded·serif) · 띠 색 · 줄 간격
     @Published var captionFont: String { didSet { d.set(captionFont, forKey: "tl.screen_font"); redraw() } }
     @Published var captionBar: String { didSet { d.set(captionBar, forKey: "tl.screen_bar"); redraw() } }
@@ -321,7 +319,6 @@ final class TLScreenModel: ObservableObject {
         showSrc = d.object(forKey: "tl.screen_src") as? Bool ?? true
         fontScale = d.object(forKey: "tl.screen_fs") as? Double ?? 1
         wide = d.object(forKey: "tl.screen_wide") as? Bool ?? false
-        history = d.object(forKey: "tl.screen_hist") as? Int ?? 3
         captionFont = d.string(forKey: "tl.screen_font") ?? "default"
         captionBar = d.string(forKey: "tl.screen_bar") ?? "blue"
         captionSpacing = d.object(forKey: "tl.screen_spacing") as? Double ?? 1
@@ -527,9 +524,11 @@ final class TLScreenModel: ObservableObject {
 
     // MARK: 그리기
 
-    /// 지금 PIP 에 보일 줄들: 이전 대화 몇 줄 + 말하는 중인 줄
+    /// 지금 PIP 에 그릴 줄들: 최근 줄들 + 말하는 중인 줄. 몇 줄이 보일지는 창 높이가 정한다 —
+    /// 아래부터 쌓고 창 위로 넘친 줄은 잘려서, 스크롤되어 올라가는 것처럼 보인다.
+    static let maxCaptionLines = 20
     var captionLines: [TLCaptionLine] {
-        var out = lines.suffix(max(0, history)).map { TLCaptionLine(src: $0.src, dst: $0.dst, temp: false, who: $0.who) }
+        var out = lines.suffix(Self.maxCaptionLines).map { TLCaptionLine(src: $0.src, dst: $0.dst, temp: false, who: $0.who) }
         let s = (cur?.src ?? "") + pSrc, t = (cur?.dst ?? "") + pDst
         if !s.trimmed.isEmpty || !t.trimmed.isEmpty { out.append(TLCaptionLine(src: s, dst: t, temp: true, who: pWho)) }
         return out
@@ -611,8 +610,8 @@ struct TLCaptionView: View {
     var body: some View {
         ZStack(alignment: .top) {
             Color.white
+            // 아래부터 쌓는다. 창보다 길어지면 위로 넘치고, 넘친 부분은 잘리면서 위쪽은 흐려진다.
             VStack(alignment: .leading, spacing: 7 * spacing) {
-                Spacer(minLength: 0)
                 if let m = message {
                     if !m.text.isEmpty {
                         Text(m.text)
@@ -625,10 +624,12 @@ struct TLCaptionView: View {
                     }
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, wide ? 16 : 12)
-            .padding(.top, barH + 10)
             .padding(.bottom, wide ? 10 : 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .clipped()
+            .padding(.top, barH + 4)
             .mask(GeometryReader { g in
                 let a = barH / max(1, g.size.height)
                 LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: a),
