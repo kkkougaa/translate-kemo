@@ -4,7 +4,8 @@ import llama
 #endif
 
 // 기기 안 번역 엔진 — PLaMo 3 Translate (Preferred Networks) 를 llama.cpp 로 돌린다.
-// 본 앱과 확장(기본 번역 앱 · 공유 시트)이 같이 쓴다. 모델 파일은 앱 그룹 폴더에 둬서 확장도 읽는다.
+// 본 앱만 쓴다. 기본 번역 앱 · 공유 시트(확장)는 메모리 한도가 빡빡해 꺼져서 Gemini 로 둔다.
+// 모델 파일은 앱 그룹 폴더에 둔다 (첫 버전 자리에서 옮겨 온 그대로).
 //
 // 프롬프트는 모델 카드의 PFML3 형식을 그대로 만든다:
 //   <|plamo:tag|>dataset<|plamo:msg|>translation
@@ -115,7 +116,6 @@ final class TLPlamoEngine: @unchecked Sendable {
 
         static let app = Profile()
         static let background = Profile(gpu: false, context: 2048, lean: true)
-        static let ext = Profile(gpu: false, context: 2048, lean: true)
     }
 
     private let queue = DispatchQueue(label: "com.kouga.kemotranslate.plamo", qos: .userInitiated)

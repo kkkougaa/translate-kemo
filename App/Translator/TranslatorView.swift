@@ -258,11 +258,10 @@ struct TranslatorView: View {
             return
         }
         TLHaptic.select()
-        // 위에서 바꾸면 설정 → 기능별 모델을 통째로 바꾼다 (코멘트·피드백·사진·독음은 언제나 Gemini)
+        // 위에서 바꾸면 설정 → 기능별 모델을 통째로 바꾼다 (기본 번역 앱 카드·코멘트·피드백·사진·독음은 언제나 Gemini)
         withAnimation(.snappy(duration: 0.25)) {
             store.engine = e
             store.engineBack = e
-            store.engineExt = e
             store.engineScreen = e == "plamo" ? "plamo" : "soniox"
         }
         m.show(e == "plamo" ? "기기 안 PLaMo 로 바꿨어요" : "Gemini 로 바꿨어요")

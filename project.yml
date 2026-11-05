@@ -106,11 +106,6 @@ targets:
       - path: App/Translator/Gemini.swift
       - path: Shared/Glass.swift
       - path: Shared/Haptics.swift
-      - path: Shared/TLPlamoEngine.swift
-    # 기기 안 번역 엔진 — 앱에 넣은 llama.framework 를 같이 쓴다 (확장엔 따로 안 넣는다)
-    dependencies:
-      - framework: Vendor/llama.xcframework
-        embed: false
     info:
       path: ShareExtension/Info.plist
       properties:
@@ -131,8 +126,6 @@ targets:
         PRODUCT_NAME: TranslateKemoShare
         CODE_SIGN_ENTITLEMENTS: ShareExtension/TranslateKemoShare.entitlements
         APPLICATION_EXTENSION_API_ONLY: "YES"
-        # 앱의 Frameworks 폴더(llama.framework)를 찾게 — PlugIns/X.appex/X → ../../Frameworks
-        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"]
         SKIP_INSTALL: "YES"
 
   # 기본 번역 앱 확장 (iOS 18.4+) — 글을 고르고 '번역'을 누르면 시스템 시트 안에 우리 카드
@@ -152,10 +145,6 @@ targets:
       - path: App/Translator/Gemini.swift
       - path: Shared/Glass.swift
       - path: Shared/Haptics.swift
-      - path: Shared/TLPlamoEngine.swift
-    dependencies:
-      - framework: Vendor/llama.xcframework
-        embed: false
     info:
       path: TranslateExtension/Info.plist
       properties:
@@ -171,8 +160,6 @@ targets:
         PRODUCT_NAME: TranslateKemoTranslate
         CODE_SIGN_ENTITLEMENTS: TranslateExtension/TranslateKemoTranslate.entitlements
         APPLICATION_EXTENSION_API_ONLY: "YES"
-        # 앱의 Frameworks 폴더(llama.framework)를 찾게 — Extensions/X.appex/X → ../../Frameworks
-        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"]
         SKIP_INSTALL: "YES"
 
 schemes:

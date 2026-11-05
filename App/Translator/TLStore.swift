@@ -55,8 +55,6 @@ final class TLStore: ObservableObject {
     @Published var engineBack: String { didSet { d.set(engineBack, forKey: k("engine_back")) } }
     /// 화면 소리 번역 — soniox(받아쓰기와 번역을 Soniox 가 같이) · plamo(받아쓰기만 Soniox, 번역은 기기 안)
     @Published var engineScreen: String { didSet { d.set(engineScreen, forKey: k("engine_screen")) } }
-    /// 기본 번역 앱 · 공유 시트 카드
-    @Published var engineExt: String { didSet { d.set(engineExt, forKey: k("engine_ext")); TLShare.publish() } }
     @Published var ttsModel: String { didSet { d.set(ttsModel.trimmed, forKey: k("gemini_tts_model")) } }
     @Published var ttsVoice: String { didSet { d.set(ttsVoice, forKey: k("gemini_tts_voice")) } }
     @Published var ttsStyle: String { didSet { d.set(ttsStyle, forKey: k("gemini_tts_style")) } }
@@ -82,7 +80,6 @@ final class TLStore: ObservableObject {
         engine = d.string(forKey: "tl.engine") ?? "gemini"
         engineBack = d.string(forKey: "tl.engine_back") ?? "gemini"
         engineScreen = d.string(forKey: "tl.engine_screen") ?? "soniox"
-        engineExt = d.string(forKey: "tl.engine_ext") ?? "gemini"
         barTint = d.string(forKey: "tl.bar_tint") ?? TLStore.defaultBarTint
         buttonTint = d.string(forKey: "tl.button_tint") ?? ""
         writeTint = d.string(forKey: "tl.write_tint") ?? TLStore.defaultWriteTint

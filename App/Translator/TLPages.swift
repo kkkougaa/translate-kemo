@@ -543,7 +543,7 @@ struct TLSettingsPage: View {
             enginePicker("번역", $store.engine, other: ("gemini", "Gemini"))
             enginePicker("역번역", $store.engineBack, other: ("gemini", "Gemini"))
             enginePicker("화면 소리 번역", $store.engineScreen, other: ("soniox", "Soniox"))
-            enginePicker("기본 번역 앱 · 공유 시트", $store.engineExt, other: ("gemini", "Gemini"))
+            LabeledContent("기본 번역 앱 · 공유 시트", value: "Gemini")
             LabeledContent("코멘트 · 피드백 · 사진 · 독음", value: "Gemini")
         } header: {
             Text("기능별 모델")

@@ -36,9 +36,6 @@ final class TLActionModel: ObservableObject {
     @Published private(set) var done = false
     @Published private(set) var empty = false
     @Published private(set) var needKey = false
-    /// 이번 결과를 기기 안 PLaMo 가 만들었나
-    @Published private(set) var usedPlamo = false
-    private var shownFallback = false
     @Published var keyInput = ""
     @Published var toast: String?
 
@@ -100,110 +97,15 @@ final class TLActionModel: ObservableObject {
         translate()
     }
 
-    /// 기기 안 모델을 쓸까 — 설정에서 골랐고, 엔진·모델 파일이 다 있고, 지난번에 메모리로 꺼지지 않았을 때
-    private var useLocal: Bool {
-        settings.engine == "plamo" && TLPlamoEngine.compiled && TLPlamoFiles.installed && !Self.crashedBefore
-    }
-
-    // 확장이 메모리 한도를 넘으면 iOS 가 에러 없이 꺼 버려서 잡을 수가 없다.
-    // 기기 안 번역을 시작할 때 표시를 남기고 끝나면 지운다. 다음에 열었을 때 표시가 남아 있으면
-    // 지난번에 꺼진 것 — 그 모델 파일로는 기기 안 번역을 건너뛰고 Gemini 로 한다 (모델을 바꾸면 다시 해 본다).
-    private static let runningKey = "tl.plamo_ext_running"
-    private static let crashedKey = "tl.plamo_ext_crashed"
-    private static var group: UserDefaults? { UserDefaults(suiteName: TLPlamoFiles.group) }
-    /// 모델 파일 크기 · 수정 시각 — 모델을 바꾸면 달라진다
-    private static var modelStamp: String {
-        let a = try? FileManager.default.attributesOfItem(atPath: TLPlamoFiles.modelURL.path)
-        let size = (a?[.size] as? NSNumber)?.int64Value ?? 0
-        let date = (a?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
-        return "\(size)-\(Int(date))"
-    }
-    /// 이 확장 프로세스가 처음 뜰 때 한 번만 본다 — 지금 돌고 있는 번역의 표시를 꺼진 걸로 착각하지 않게
-    private static let staleChecked: Bool = {
-        guard let g = group else { return false }
-        if let r = g.string(forKey: runningKey) {
-            g.removeObject(forKey: runningKey)
-            g.set(r, forKey: crashedKey)
-        }
-        return true
-    }()
-    private static var crashedBefore: Bool {
-        _ = staleChecked
-        return group?.string(forKey: crashedKey) == modelStamp
-    }
-    private static func markRunning(_ on: Bool) {
-        if on { group?.set(modelStamp, forKey: runningKey) } else { group?.removeObject(forKey: runningKey) }
-    }
-
     func translate() {
         task?.cancel()
         seq += 1
+        let my = seq
         let text = source.trimmed
         guard !text.isEmpty else { return }
-        if useLocal { translateLocal(text); return }
-        translateGemini(text)
-    }
-
-    /// 기기 안 PLaMo. 메모리가 모자라 못 올리는 등 실패하면 Gemini 로 다시 한다 (키가 있을 때).
-    private func translateLocal(_ text: String) {
-        let my = seq
-        needKey = false
-        busy = true; streaming = false; done = false; usedPlamo = true
-        result = ""; comment = ""; error = ""
-        let s = settings
-        let sLang = srcLang, outL = outLang, toKO = self.toKO
-        let parsed = TLText.parseInput(text)
-        let pairs = Glossary.parse(s.glossary[tgtLang] ?? "")
-        let prompt = TLPlamoPrompt.build(text: parsed.body, src: sLang, tgt: outL,
-                                         glossary: TLPlamoPrompt.glossary(pairs, text: parsed.body, toKO: toKO))
-        Self.markRunning(true)
-        task = Task { [weak self] in
-            defer { Self.markRunning(false) }
-            do {
-                let full = try await TLPlamoEngine.shared.translate(prompt: prompt, profile: .ext) { partial in
-                    DispatchQueue.main.async {
-                        MainActor.assumeIsolated {
-                            guard let self, my == self.seq else { return }
-                            self.streaming = true
-                            self.result = partial.trimmedStart
-                        }
-                    }
-                }
-                guard let self, my == self.seq else { return }
-                let clean = TLText.cleanForCopy(Glossary.enforce(TLText.tidyOut(full.trimmed, tgtLang: outL), srcText: parsed.body,
-                                                                 outLang: outL, pairs: pairs, toKO: toKO))
-                if clean.isEmpty { throw GeminiError(message: "번역 결과를 받지 못했습니다.") }
-                self.result = clean
-                self.busy = false
-                self.streaming = false
-                self.done = true
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            } catch is CancellationError {
-            } catch {
-                guard let self, my == self.seq else { return }
-                self.usedPlamo = false
-                if self.settings.hasKey {
-                    self.show("기기 안 번역 실패 — Gemini 로 할게요")
-                    self.translateGemini(text)
-                } else {
-                    self.busy = false
-                    self.streaming = false
-                    self.error = "오류: " + error.localizedDescription
-                    UINotificationFeedbackGenerator().notificationOccurred(.error)
-                }
-            }
-        }
-    }
-
-    private func translateGemini(_ text: String) {
-        let my = seq
-        if settings.engine == "plamo" && Self.crashedBefore && !shownFallback {
-            shownFallback = true
-            show("기기 안 번역이 메모리 부족으로 꺼져서 Gemini 로 할게요")
-        }
         guard settings.hasKey else { needKey = true; return }
         needKey = false
-        busy = true; streaming = false; done = false; usedPlamo = false
+        busy = true; streaming = false; done = false
         result = ""; comment = ""; error = ""
 
         let s = settings
@@ -273,8 +175,7 @@ final class TLActionModel: ObservableObject {
         }
     }
 
-    /// 닫을 때도 부른다 — 사람이 닫은 걸 메모리로 꺼진 걸로 착각하지 않게 표시를 지운다
-    func cancel() { task?.cancel(); seq += 1; Self.markRunning(false) }
+    func cancel() { task?.cancel(); seq += 1 }
 }
 
 // MARK: 카드
@@ -355,11 +256,6 @@ struct TLActionView: View {
                 sourceText
                 Divider()
                 resultArea
-                if m.usedPlamo && m.done {
-                    Text("기기 안 PLaMo")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(Color.taText3)
-                }
                 if !m.comment.isEmpty { commentBox }
                 if !m.error.isEmpty {
                     Text(m.error)

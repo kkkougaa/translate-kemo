@@ -31,8 +31,7 @@ enum TLShare {
             "gemini_model": s.model.trimmed,
             "thinking": s.thinking ? "1" : "0",
             "char_prompt_default": s.charPrompt,
-            "last_tgt": UserDefaults.standard.string(forKey: "tl.last_tgt") ?? "ja",
-            "engine_ext": s.engineExt
+            "last_tgt": UserDefaults.standard.string(forKey: "tl.last_tgt") ?? "ja"
         ]
         for l in TLLang.order {
             dict["glossary_" + l] = Glossary.serialize(s.glossary(l))

@@ -8,9 +8,9 @@
 - Gemini(번역·독음·사전·TTS·사진), Soniox(대화 모드·화면 소리 번역·말로 입력) — 키는 이용자가 직접 넣는다
 - 기기 안 번역: [PLaMo 3 Translate](https://huggingface.co/collections/pfnet/plamo-3-translate) (PLaMo Community License).
   앱엔 엔진(llama.cpp, CI 가 `.github/scripts/fetch_llama.sh` 로 받음)만 넣고, 모델 `.gguf` 는 설정 → 번역에서 파일로 가져온다.
-  추천 2B Q4_K_M(1.81GB), 가볍게 0.8B Q4_K_M(0.57GB). 모델은 앱 그룹 폴더에 둬서 확장도 같이 쓴다.
-  설정 → 번역 → 기능별 모델에서 번역 · 역번역 · 화면 소리 번역 · 기본 번역 앱/공유 시트마다 Gemini(Soniox)/PLaMo 를 고른다.
-  코멘트·피드백·사진·독음은 Gemini.
+  추천 2B Q4_K_M(1.81GB), 가볍게 0.8B Q4_K_M(0.57GB).
+  설정 → 번역 → 기능별 모델(또는 메인 화면 '번역기' 옆 드롭다운)에서 번역 · 역번역 · 화면 소리 번역마다 Gemini(Soniox)/PLaMo 를 고른다.
+  기본 번역 앱/공유 시트 카드는 확장 메모리 한도 때문에 Gemini 고정. 코멘트·피드백·사진·독음도 Gemini.
 
 ## 빌드 · 배포
 
@@ -42,7 +42,7 @@ App/
     TLTalk · TLStudy · TLWords · TLBackup   대화 모드 · 공부 · 표현 노트 · 백업
   Assets.xcassets          앱 아이콘, PIP 자막·카드에 쓰는 logo
   PrivacyInfo.xcprivacy    개인정보 매니페스트
-Shared/                    글래스·햅틱 도우미, TLPlamoEngine(llama.cpp 로 PLaMo 돌리기·PFML3 프롬프트) — 확장도 같이 쓴다
+Shared/                    글래스·햅틱 도우미, TLPlamoEngine(llama.cpp 로 PLaMo 돌리기·PFML3 프롬프트)
 ShareExtension/            공유 시트 "translate-kemo" 카드
 TranslateExtension/        기본 번역 앱 확장 (iOS 18.4+), 카드는 ShareExtension 것을 쓴다
 BroadcastExtension/        화면 기록 확장 — 다른 앱 소리를 16kHz 모노로 127.0.0.1:48231 에 넘긴다
