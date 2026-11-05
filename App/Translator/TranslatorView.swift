@@ -67,7 +67,13 @@ struct TranslatorView: View {
                      onWrite: write, onTranslate: { m.translateOrCancel() },
                      onMenu: { focus = nil; drawerOpen = true })
                 .ignoresSafeArea(barMode == .translate ? [] : .keyboard)
+                // 피드백 칸처럼 번역 입력칸이 아닌 곳에 키보드가 떠 있으면 바를 아예 숨긴다.
+                // 그동안은 화면도 바 자리를 안 비우니(tlBarSpace 0) 떠 있으면 아래 버튼을 가린다.
+                .opacity(barHidden ? 0 : 1)
+                .allowsHitTesting(!barHidden)
+                .accessibilityHidden(barHidden)
                 .animation(.spring(duration: 0.45, bounce: 0.22), value: barMode)
+                .animation(.easeOut(duration: 0.18), value: barHidden)
         }
         .onChange(of: tab) { _, t in visited.insert(t) }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
@@ -98,6 +104,11 @@ struct TranslatorView: View {
         guard tab == .home else { return .full }
         if focus == .input { return .translate }
         return barCollapsed ? .write : .full
+    }
+
+    /// 번역 버튼으로 키보드 위에 올라온 때 말고, 키보드가 떠 있거나 다른 칸을 쓰는 동안엔 바를 숨긴다
+    private var barHidden: Bool {
+        barMode != .translate && (keyboardUp || focus != nil)
     }
 
     /// 쓰기 버튼 — 번역 화면 맨 위로 올라가 입력칸에 키보드를 연다
