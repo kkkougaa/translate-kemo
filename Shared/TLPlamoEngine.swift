@@ -108,11 +108,14 @@ final class TLPlamoEngine: @unchecked Sendable {
         var gpu = true
         /// 입력 + 출력 토큰 한도
         var context: Int32 = 6144
+        /// 메모리를 아끼는 모양 — 확장은 메모리 한도가 빡빡해서 넘으면 iOS 가 바로 꺼 버린다.
+        /// 모델은 mmap 으로만 읽고(파일에 기대는 깨끗한 페이지라 한도에 거의 안 잡힌다),
+        /// 가중치 재배열 복사를 끄고, 작업 버퍼를 줄인다. GPU 를 쓰면 모델이 통째로 잡혀서 CPU 로.
+        var lean = false
 
         static let app = Profile()
-        static let background = Profile(gpu: false, context: 2048)
-        /// 확장은 메모리 한도가 빡빡하다 — 컨텍스트를 줄인다
-        static let ext = Profile(gpu: true, context: 3072)
+        static let background = Profile(gpu: false, context: 2048, lean: true)
+        static let ext = Profile(gpu: false, context: 2048, lean: true)
     }
 
     private let queue = DispatchQueue(label: "com.kouga.kemotranslate.plamo", qos: .userInitiated)
@@ -141,13 +144,17 @@ final class TLPlamoEngine: @unchecked Sendable {
         }
         var mp = llama_model_default_params()
         mp.n_gpu_layers = profile.gpu ? 999 : 0
+        if profile.lean {
+            mp.load_mode = LLAMA_LOAD_MODE_MMAP
+            mp.use_extra_bufts = false
+        }
         guard let m = llama_model_load_from_file(path, mp) else {
             throw GeminiError(message: "PLaMo 모델을 열지 못했어요. 파일이 깨졌거나 PLaMo 3 Translate GGUF 가 아닐 수 있어요.")
         }
         var cp = llama_context_default_params()
         cp.n_ctx = UInt32(profile.context)
-        cp.n_batch = 1024
-        cp.n_ubatch = 512
+        cp.n_batch = profile.lean ? 512 : 1024
+        cp.n_ubatch = profile.lean ? 256 : 512
         let th = Int32(max(1, min(6, ProcessInfo.processInfo.activeProcessorCount - 2)))
         cp.n_threads = th
         cp.n_threads_batch = th
@@ -193,7 +200,7 @@ final class TLPlamoEngine: @unchecked Sendable {
         let limit = min(maxTokens, room)
 
         // 원문 읽히기 — 한 번에 n_batch 만큼씩
-        let step = 1024
+        let step = profile.lean ? 512 : 1024
         var i = 0
         while i < tokens.count {
             if cancelled { throw CancellationError() }

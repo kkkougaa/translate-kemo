@@ -38,6 +38,7 @@ final class TLActionModel: ObservableObject {
     @Published private(set) var needKey = false
     /// 이번 결과를 기기 안 PLaMo 가 만들었나
     @Published private(set) var usedPlamo = false
+    private var shownFallback = false
     @Published var keyInput = ""
     @Published var toast: String?
 
@@ -99,8 +100,40 @@ final class TLActionModel: ObservableObject {
         translate()
     }
 
-    /// 기기 안 모델을 쓸까 — 설정에서 골랐고, 엔진·모델 파일이 다 있을 때
-    private var useLocal: Bool { settings.engine == "plamo" && TLPlamoEngine.compiled && TLPlamoFiles.installed }
+    /// 기기 안 모델을 쓸까 — 설정에서 골랐고, 엔진·모델 파일이 다 있고, 지난번에 메모리로 꺼지지 않았을 때
+    private var useLocal: Bool {
+        settings.engine == "plamo" && TLPlamoEngine.compiled && TLPlamoFiles.installed && !Self.crashedBefore
+    }
+
+    // 확장이 메모리 한도를 넘으면 iOS 가 에러 없이 꺼 버려서 잡을 수가 없다.
+    // 기기 안 번역을 시작할 때 표시를 남기고 끝나면 지운다. 다음에 열었을 때 표시가 남아 있으면
+    // 지난번에 꺼진 것 — 그 모델 파일로는 기기 안 번역을 건너뛰고 Gemini 로 한다 (모델을 바꾸면 다시 해 본다).
+    private static let runningKey = "tl.plamo_ext_running"
+    private static let crashedKey = "tl.plamo_ext_crashed"
+    private static var group: UserDefaults? { UserDefaults(suiteName: TLPlamoFiles.group) }
+    /// 모델 파일 크기 · 수정 시각 — 모델을 바꾸면 달라진다
+    private static var modelStamp: String {
+        let a = try? FileManager.default.attributesOfItem(atPath: TLPlamoFiles.modelURL.path)
+        let size = (a?[.size] as? NSNumber)?.int64Value ?? 0
+        let date = (a?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        return "\(size)-\(Int(date))"
+    }
+    /// 이 확장 프로세스가 처음 뜰 때 한 번만 본다 — 지금 돌고 있는 번역의 표시를 꺼진 걸로 착각하지 않게
+    private static let staleChecked: Bool = {
+        guard let g = group else { return false }
+        if let r = g.string(forKey: runningKey) {
+            g.removeObject(forKey: runningKey)
+            g.set(r, forKey: crashedKey)
+        }
+        return true
+    }()
+    private static var crashedBefore: Bool {
+        _ = staleChecked
+        return group?.string(forKey: crashedKey) == modelStamp
+    }
+    private static func markRunning(_ on: Bool) {
+        if on { group?.set(modelStamp, forKey: runningKey) } else { group?.removeObject(forKey: runningKey) }
+    }
 
     func translate() {
         task?.cancel()
@@ -123,7 +156,9 @@ final class TLActionModel: ObservableObject {
         let pairs = Glossary.parse(s.glossary[tgtLang] ?? "")
         let prompt = TLPlamoPrompt.build(text: parsed.body, src: sLang, tgt: outL,
                                          glossary: TLPlamoPrompt.glossary(pairs, text: parsed.body, toKO: toKO))
+        Self.markRunning(true)
         task = Task { [weak self] in
+            defer { Self.markRunning(false) }
             do {
                 let full = try await TLPlamoEngine.shared.translate(prompt: prompt, profile: .ext) { partial in
                     DispatchQueue.main.async {
@@ -162,6 +197,10 @@ final class TLActionModel: ObservableObject {
 
     private func translateGemini(_ text: String) {
         let my = seq
+        if settings.engine == "plamo" && Self.crashedBefore && !shownFallback {
+            shownFallback = true
+            show("기기 안 번역이 메모리 부족으로 꺼져서 Gemini 로 할게요")
+        }
         guard settings.hasKey else { needKey = true; return }
         needKey = false
         busy = true; streaming = false; done = false; usedPlamo = false
@@ -234,7 +273,8 @@ final class TLActionModel: ObservableObject {
         }
     }
 
-    func cancel() { task?.cancel(); seq += 1 }
+    /// 닫을 때도 부른다 — 사람이 닫은 걸 메모리로 꺼진 걸로 착각하지 않게 표시를 지운다
+    func cancel() { task?.cancel(); seq += 1; Self.markRunning(false) }
 }
 
 // MARK: 카드
