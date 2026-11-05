@@ -70,8 +70,9 @@ final class TLStore: ObservableObject {
     private init() {
         apiKey = d.string(forKey: "tl.gemini_api_key") ?? ""
         let savedModel = d.string(forKey: "tl.gemini_model") ?? ""
-        model = TLStore.legacyDefaultModels.contains(savedModel.trimmed) ? "" : savedModel
-        if model.isEmpty { d.removeObject(forKey: "tl.gemini_model") }
+        let legacy = TLStore.legacyDefaultModels.contains(savedModel.trimmed)
+        model = legacy ? "" : savedModel
+        if legacy { d.removeObject(forKey: "tl.gemini_model") }
         thinking = d.bool(forKey: "tl.thinking")
         priority = d.string(forKey: "tl.gemini_priority") == "1"
         autoDetect = d.string(forKey: "tl.auto_detect") != "0"
