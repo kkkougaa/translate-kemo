@@ -217,10 +217,47 @@ struct TranslatorView: View {
                 .font(.system(size: 22, weight: .bold))
                 .tracking(-0.7)
                 .padding(.leading, 2)
+            engineMenu
             Spacer()
             TLCircleButton(symbol: "clock.arrow.circlepath", label: "번역 기록") { path = [.history] }
         }
         .padding(.top, 2)
+    }
+
+    /// 번역 엔진 고르기 — 속어처럼 문맥이 중요한 글은 Gemini 가 나을 때가 있어서 바로 바꿀 수 있게
+    private var engineMenu: some View {
+        Menu {
+            Picker("번역 엔진", selection: Binding(get: { store.engine }, set: { pickEngine($0) })) {
+                Label("Gemini", systemImage: "sparkle").tag("gemini")
+                Label(TLPlamo.shared.ready ? "PLaMo (기기 안)" : "PLaMo — 모델 없음", systemImage: "iphone").tag("plamo")
+            }
+        } label: {
+            HStack(spacing: 5) {
+                TLEngineBadge(engine: store.engine)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.tlText3)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Color.tlFill, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.leading, 4)
+        .accessibilityLabel("번역 엔진")
+        .accessibilityValue(store.engine == "plamo" ? "PLaMo" : "Gemini")
+    }
+
+    private func pickEngine(_ e: String) {
+        guard e != store.engine else { return }
+        if e == "plamo" && !TLPlamo.shared.ready {
+            m.show("설정 → 번역에서 PLaMo 모델 파일을 먼저 가져와 주세요")
+            TLHaptic.error()
+            return
+        }
+        TLHaptic.select()
+        withAnimation(.snappy(duration: 0.25)) { store.engine = e }
     }
 
     // MARK: 언어 바

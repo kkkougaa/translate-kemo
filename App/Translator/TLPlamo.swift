@@ -121,3 +121,50 @@ final class TLPlamo: ObservableObject {
         refreshSize()
     }
 }
+
+// MARK: 엔진 배지 (메인 화면 위 드롭다운)
+
+/// 지금 번역 엔진 — Gemini 는 반짝이 + 이름, PLaMo 는 로고 글자
+struct TLEngineBadge: View {
+    let engine: String
+    var height: CGFloat = 15
+
+    var body: some View {
+        if engine == "plamo" {
+            Image("plamo")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(height: height - 2)
+                .accessibilityLabel("PLaMo")
+        } else {
+            HStack(spacing: 4) {
+                TLGeminiSparkle()
+                    .fill(LinearGradient(colors: [Color(red: 0.26, green: 0.52, blue: 0.96),
+                                                  Color(red: 0.61, green: 0.45, blue: 0.80)],
+                                         startPoint: .bottomLeading, endPoint: .topTrailing))
+                    .frame(width: height, height: height)
+                Text("Gemini")
+                    .font(.system(size: height, weight: .semibold))
+                    .tracking(-0.3)
+                    .foregroundStyle(Color.primary)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+/// 네 갈래 반짝이 — 가운데로 오목하게 모이는 별
+struct TLGeminiSparkle: Shape {
+    func path(in r: CGRect) -> Path {
+        let c = CGPoint(x: r.midX, y: r.midY)
+        var p = Path()
+        p.move(to: CGPoint(x: r.midX, y: r.minY))
+        p.addQuadCurve(to: CGPoint(x: r.maxX, y: r.midY), control: c)
+        p.addQuadCurve(to: CGPoint(x: r.midX, y: r.maxY), control: c)
+        p.addQuadCurve(to: CGPoint(x: r.minX, y: r.midY), control: c)
+        p.addQuadCurve(to: CGPoint(x: r.midX, y: r.minY), control: c)
+        p.closeSubpath()
+        return p
+    }
+}
